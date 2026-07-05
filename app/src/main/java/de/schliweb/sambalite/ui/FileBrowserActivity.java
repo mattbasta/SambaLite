@@ -110,6 +110,7 @@ public class FileBrowserActivity extends AppCompatActivity
   private RecyclerView recyclerView;
   private SwipeRefreshLayout swipeRefreshLayout;
   private View emptyView;
+  private View loadingView;
   FloatingActionButton fab;
   FloatingActionButton fabCreateFolder;
   private FloatingActionButton fabMultiOptions;
@@ -414,6 +415,7 @@ public class FileBrowserActivity extends AppCompatActivity
     recyclerView = findViewById(R.id.files_recycler_view);
     swipeRefreshLayout = findViewById(R.id.swipe_refresh);
     emptyView = findViewById(R.id.empty_state);
+    loadingView = findViewById(R.id.loading_state);
     fab = findViewById(R.id.fab);
     fabCreateFolder = findViewById(R.id.fab_create_folder);
     fabMultiOptions = findViewById(R.id.fab_multi_options);
@@ -677,7 +679,7 @@ public class FileBrowserActivity extends AppCompatActivity
     progressController = new ProgressController(this);
     fileListController =
         new FileListController(
-            recyclerView, swipeRefreshLayout, emptyView, fileListViewModel, uiState);
+            recyclerView, swipeRefreshLayout, emptyView, loadingView, fileListViewModel, uiState);
 
     dialogController =
         new DialogController(
