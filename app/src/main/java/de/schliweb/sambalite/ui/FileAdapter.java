@@ -598,14 +598,14 @@ public class FileAdapter extends RecyclerView.Adapter<FileAdapter.FileViewHolder
             android.content.res.ColorStateList.valueOf(
                 MaterialColors.getColor(
                     iconView,
-                    com.google.android.material.R.attr.colorOnPrimary,
-                    android.graphics.Color.WHITE)));
+                    com.google.android.material.R.attr.colorOnSurfaceVariant,
+                    android.graphics.Color.DKGRAY)));
         if (iconContainer != null) {
           iconContainer.setCardBackgroundColor(
               MaterialColors.getColor(
                   iconContainer,
-                  androidx.appcompat.R.attr.colorPrimary,
-                  android.graphics.Color.BLUE));
+                  com.google.android.material.R.attr.colorSurfaceVariant,
+                  android.graphics.Color.LTGRAY));
         }
         iconView.setTag(null);
         if (file.isDirectory()) {

@@ -55,7 +55,6 @@ import javax.inject.Inject;
  */
 public class FileBrowserActivity extends AppCompatActivity
     implements FileListController.FileOptionsCallback,
-        FileListController.FileStatisticsCallback,
         FileOperationsController.FileOperationListener,
         DialogController.FileOpenCallback,
         DialogController.MultiSelectCallback {
@@ -495,7 +494,6 @@ public class FileBrowserActivity extends AppCompatActivity
             searchResults -> {
               if (searchViewModel.isInSearchMode() && searchResults != null) {
                 fileListController.updateAdapter(searchResults);
-                onFileStatisticsUpdated(searchResults);
                 // Update toolbar to indicate search mode
                 if (getSupportActionBar() != null) {
                   getSupportActionBar()
@@ -704,7 +702,6 @@ public class FileBrowserActivity extends AppCompatActivity
   private void setupControllerCallbacks() {
     // Set up FileListController callbacks
     fileListController.setFileOptionsCallback(this);
-    fileListController.setFileStatisticsCallback(this);
     fileListController.setFolderChangeCallback(this::onRemoteFolderChanged);
 
     // Set up DialogController callbacks
@@ -2074,35 +2071,6 @@ public class FileBrowserActivity extends AppCompatActivity
     LogUtils.d("FileBrowserActivity", "Multi-delete requested for " + files.size() + " items");
     fileOperationsController.handleMultipleFileDelete(files);
     fileListController.clearSelection();
-  }
-
-  // FileListController.FileStatisticsCallback implementation
-  @Override
-  public void onFileStatisticsUpdated(@NonNull java.util.List<SmbFileItem> files) {
-    int fileCount = 0;
-    int folderCount = 0;
-
-    for (SmbFileItem file : files) {
-      if (file.isDirectory()) {
-        folderCount++;
-      } else {
-        fileCount++;
-      }
-    }
-
-    TextView filesCountView = findViewById(R.id.files_count);
-    TextView foldersCountView = findViewById(R.id.folders_count);
-
-    if (filesCountView != null) {
-      filesCountView.setText(String.valueOf(fileCount));
-    }
-    if (foldersCountView != null) {
-      foldersCountView.setText(String.valueOf(folderCount));
-    }
-
-    LogUtils.d(
-        "FileBrowserActivity",
-        "Statistics updated: " + fileCount + " files, " + folderCount + " folders");
   }
 
   // FileOperationsController.FileOperationListener implementation

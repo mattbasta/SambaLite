@@ -58,7 +58,6 @@ public class FileListController
   // Callback interfaces
   @Setter private FileOptionsCallback fileOptionsCallback;
 
-  @Setter private FileStatisticsCallback fileStatisticsCallback;
   @Setter private FolderChangeCallback folderChangeCallback;
 
   /**
@@ -133,10 +132,6 @@ public class FileListController
               adapter.setSelectedPaths(selectedPaths);
               updateEmptyView(files);
               swipeRefreshLayout.setRefreshing(false);
-              // Update file statistics if callback is set
-              if (fileStatisticsCallback != null) {
-                fileStatisticsCallback.onFileStatisticsUpdated(files);
-              }
               // Refresh active upload indicators from DB
               refreshActiveUploadPaths();
             });
@@ -498,16 +493,6 @@ public class FileListController
      * @param selectedItems The list of selected items
      */
     default void onMultiSelectOptionsClick(@NonNull List<SmbFileItem> selectedItems) {}
-  }
-
-  /** Callback for file statistics updates. */
-  public interface FileStatisticsCallback {
-    /**
-     * Called when the file statistics are updated.
-     *
-     * @param files The list of files
-     */
-    void onFileStatisticsUpdated(@NonNull List<SmbFileItem> files);
   }
 
   /**
