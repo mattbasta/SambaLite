@@ -10,7 +10,6 @@
 package de.schliweb.sambalite.ui.controllers;
 
 import android.view.View;
-import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -43,7 +42,6 @@ public class FileListController
   private final RecyclerView recyclerView;
   private final SwipeRefreshLayout swipeRefreshLayout;
   private final View emptyView;
-  private final TextView currentPathView;
   private final FileAdapter adapter;
   private final FileListViewModel viewModel;
   private final FileBrowserUIState uiState;
@@ -69,7 +67,6 @@ public class FileListController
    * @param recyclerView The RecyclerView for displaying files
    * @param swipeRefreshLayout The SwipeRefreshLayout for pull-to-refresh
    * @param emptyView The view to show when the file list is empty
-   * @param currentPathView The TextView for displaying the current path
    * @param viewModel The FileListViewModel for business logic
    * @param uiState The shared UI state
    */
@@ -77,13 +74,11 @@ public class FileListController
       @NonNull RecyclerView recyclerView,
       @NonNull SwipeRefreshLayout swipeRefreshLayout,
       @NonNull View emptyView,
-      @NonNull TextView currentPathView,
       @NonNull FileListViewModel viewModel,
       @NonNull FileBrowserUIState uiState) {
     this.recyclerView = recyclerView;
     this.swipeRefreshLayout = swipeRefreshLayout;
     this.emptyView = emptyView;
-    this.currentPathView = currentPathView;
     this.viewModel = viewModel;
     this.uiState = uiState;
 
@@ -153,7 +148,6 @@ public class FileListController
             getLifecycleOwner(),
             path -> {
               LogUtils.d("FileListController", "Current path updated: " + path);
-              currentPathView.setText(path);
 
               // If user navigated to a different folder while in multi-select, clear and exit
               // selection mode

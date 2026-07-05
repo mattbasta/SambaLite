@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_search"
+        android:title="@string/search_files"
+        android:icon="@android:drawable/ic_menu_search"
+        app:showAsAction="ifRoom"
+        android:orderInCategory="1" />
+
+    <item
+        android:id="@+id/action_sort"
+        android:title="@string/sort"
+        app:showAsAction="never"
+        android:orderInCategory="2" />
+
+    <item
+        android:id="@+id/action_refresh"
+        android:title="@string/refresh_directory"
+        app:showAsAction="never"
+        android:orderInCategory="3" />
+
+    <item
+        android:id="@+id/action_transfer_queue"
+        android:title="@string/transfer_queue_title"
+        android:icon="@drawable/ic_transfer_queue"
+        app:showAsAction="never"
+        android:orderInCategory="8" />
+
+    <item
+        android:id="@+id/action_security_settings"
+        android:title="@string/security_settings_title"
+        android:icon="@drawable/ic_lock"
+        app:showAsAction="never"
+        android:orderInCategory="9" />
+
+    <item
+        android:id="@+id/action_system_monitor"
+        android:title="@string/system_monitor"
+        android:icon="@drawable/ic_system_monitor"
+        app:showAsAction="never"
+        android:orderInCategory="10" />
+
+    <item
+        android:id="@+id/action_quit"
+        android:title="@string/quit_app"
+        android:icon="@drawable/ic_power_off"
+        app:showAsAction="never"
+        android:orderInCategory="100" />
+</menu>

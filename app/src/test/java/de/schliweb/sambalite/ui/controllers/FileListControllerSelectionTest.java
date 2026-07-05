@@ -14,7 +14,6 @@ import static org.mockito.Mockito.*;
 
 import androidx.appcompat.app.AppCompatActivity;
 import android.view.View;
-import android.widget.TextView;
 import androidx.lifecycle.MutableLiveData;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
@@ -64,11 +63,10 @@ public class FileListControllerSelectionTest {
     RecyclerView recyclerView = new RecyclerView(activity);
     SwipeRefreshLayout swipeRefresh = new SwipeRefreshLayout(activity);
     View emptyView = new View(activity);
-    TextView pathView = new TextView(activity);
     FileBrowserUIState uiState = new FileBrowserUIState();
 
     controller =
-        new FileListController(recyclerView, swipeRefresh, emptyView, pathView, viewModel, uiState);
+        new FileListController(recyclerView, swipeRefresh, emptyView, viewModel, uiState);
 
     fileItem =
         new SmbFileItem("test.txt", "/share/test.txt", SmbFileItem.Type.FILE, 1024, new Date());
