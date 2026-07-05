@@ -17,10 +17,8 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="?attr/colorPrimary"
-            app:title="@string/app_name"
-            app:titleTextColor="?attr/colorOnPrimary"
-            app:popupTheme="@style/ThemeOverlay.AppCompat.Light" />
+            android:background="?attr/colorSurface"
+            app:title="@string/app_name" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -159,10 +157,6 @@
         android:layout_gravity="bottom|end"
         android:text="@string/add_connection"
         android:contentDescription="@string/add_connection"
-        app:icon="@android:drawable/ic_input_add"
-        app:backgroundTint="#3DB7DC"
-        app:iconTint="#FFFFFF"
-        android:textColor="#FFFFFF"
-        app:rippleColor="#693DB7DC" />
+        app:icon="@android:drawable/ic_input_add" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
