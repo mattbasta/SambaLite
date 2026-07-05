@@ -111,7 +111,6 @@ public class FileBrowserActivity extends AppCompatActivity
   private RecyclerView recyclerView;
   private SwipeRefreshLayout swipeRefreshLayout;
   private View emptyView;
-  private TextView currentPathView;
   FloatingActionButton fab;
   FloatingActionButton fabCreateFolder;
   private FloatingActionButton fabMultiOptions;
@@ -378,9 +377,26 @@ public class FileBrowserActivity extends AppCompatActivity
   /** Resets the toolbar title and subtitle after leaving search mode. */
   void resetToolbarAfterSearch() {
     if (getSupportActionBar() != null) {
-      getSupportActionBar().setTitle(getString(R.string.files_tab));
+      getSupportActionBar()
+          .setTitle(displayFolderName(fileListViewModel.getCurrentPath().getValue()));
       getSupportActionBar().setSubtitle(null);
     }
+  }
+
+  /**
+   * Returns the display name of the current folder: the last path segment, which at the share root
+   * is the share name itself.
+   */
+  private String displayFolderName(@Nullable String path) {
+    if (path == null || path.isEmpty()) {
+      return getString(R.string.files_tab);
+    }
+    String trimmed = path;
+    while (trimmed.endsWith("/")) {
+      trimmed = trimmed.substring(0, trimmed.length() - 1);
+    }
+    int lastSlash = trimmed.lastIndexOf('/');
+    return lastSlash >= 0 ? trimmed.substring(lastSlash + 1) : trimmed;
   }
 
   /** Sets up the toolbar. */
@@ -399,7 +415,6 @@ public class FileBrowserActivity extends AppCompatActivity
     recyclerView = findViewById(R.id.files_recycler_view);
     swipeRefreshLayout = findViewById(R.id.swipe_refresh);
     emptyView = findViewById(R.id.empty_state);
-    currentPathView = findViewById(R.id.current_path);
     fab = findViewById(R.id.fab);
     fabCreateFolder = findViewById(R.id.fab_create_folder);
     fabMultiOptions = findViewById(R.id.fab_multi_options);
@@ -427,6 +442,20 @@ public class FileBrowserActivity extends AppCompatActivity
 
   /** Sets up observers for ViewModels. */
   private void setupViewModelObservers() {
+    // Keep the toolbar title in sync with the current folder (folder name only, GDrive-style)
+    fileListViewModel
+        .getCurrentPath()
+        .observe(
+            this,
+            path -> {
+              if (searchViewModel != null && searchViewModel.isInSearchMode()) {
+                return; // search mode manages its own title
+              }
+              if (getSupportActionBar() != null) {
+                getSupportActionBar().setTitle(displayFolderName(path));
+              }
+            });
+
     searchViewModel
         .isSearching()
         .observe(
@@ -650,12 +679,7 @@ public class FileBrowserActivity extends AppCompatActivity
     progressController = new ProgressController(this);
     fileListController =
         new FileListController(
-            recyclerView,
-            swipeRefreshLayout,
-            emptyView,
-            currentPathView,
-            fileListViewModel,
-            uiState);
+            recyclerView, swipeRefreshLayout, emptyView, fileListViewModel, uiState);
 
     dialogController =
         new DialogController(
@@ -880,22 +904,6 @@ public class FileBrowserActivity extends AppCompatActivity
 
   /** Sets up UI event listeners. */
   private void setupUIEventListeners() {
-    // Set up search button
-    findViewById(R.id.search_button)
-        .setOnClickListener(
-            v -> {
-              LogUtils.d("FileBrowserActivity", "Search button clicked");
-              dialogController.showSearchDialog();
-            });
-
-    // Set up sort button
-    findViewById(R.id.sort_button)
-        .setOnClickListener(
-            v -> {
-              LogUtils.d("FileBrowserActivity", "Sort button clicked");
-              dialogController.showSortDialog();
-            });
-
     // Set up upload button (FAB)
     fab.setOnClickListener(
         v -> {
@@ -909,22 +917,6 @@ public class FileBrowserActivity extends AppCompatActivity
           LogUtils.d("FileBrowserActivity", "Create folder button clicked");
           dialogController.showCreateFolderDialog();
         });
-
-    // Set up parent directory button
-    findViewById(R.id.parent_directory_button)
-        .setOnClickListener(
-            v -> {
-              LogUtils.d("FileBrowserActivity", "Parent directory button clicked");
-              fileListController.navigateUp();
-            });
-
-    // Set up refresh button
-    findViewById(R.id.refresh_button)
-        .setOnClickListener(
-            v -> {
-              LogUtils.d("FileBrowserActivity", "Refresh button clicked");
-              fileListViewModel.refreshCurrentDirectory();
-            });
 
     // Auto-hide/show FABs on scroll
     recyclerView.addOnScrollListener(
@@ -1444,7 +1436,7 @@ public class FileBrowserActivity extends AppCompatActivity
   @Override
   public boolean onCreateOptionsMenu(Menu menu) {
     MenuInflater inflater = getMenuInflater();
-    inflater.inflate(R.menu.menu_main, menu);
+    inflater.inflate(R.menu.menu_file_browser, menu);
     return true;
   }
 
@@ -1534,6 +1526,15 @@ public class FileBrowserActivity extends AppCompatActivity
       }
       // Already at top-level -> finish to return to connections
       confirmFinishIfBusy();
+      return true;
+    } else if (item.getItemId() == R.id.action_search) {
+      dialogController.showSearchDialog();
+      return true;
+    } else if (item.getItemId() == R.id.action_sort) {
+      dialogController.showSortDialog();
+      return true;
+    } else if (item.getItemId() == R.id.action_refresh) {
+      fileListViewModel.refreshCurrentDirectory();
       return true;
     } else if (item.getItemId() == R.id.action_transfer_queue) {
       startActivity(TransferQueueActivity.createIntent(this));
