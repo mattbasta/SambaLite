@@ -88,8 +88,9 @@
 
     </LinearLayout>
 
-    <!-- Enhanced loading indicator -->
+    <!-- Loading state: shown while a folder loads and there is no content yet -->
     <LinearLayout
+        android:id="@+id/loading_state"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"

@@ -42,9 +42,14 @@ public class FileListController
   private final RecyclerView recyclerView;
   private final SwipeRefreshLayout swipeRefreshLayout;
   private final View emptyView;
+  private final View loadingView;
   private final FileAdapter adapter;
   private final FileListViewModel viewModel;
   private final FileBrowserUIState uiState;
+
+  // Size of the list most recently handed to the adapter; drives the loading/empty/content
+  // view-state decision without racing the adapter's async DiffUtil updates
+  private int lastListSize = 0;
 
   // Search mode flag – when true, the getFiles() observer will not overwrite search results
   @Getter @Setter private boolean searchMode = false;
@@ -66,6 +71,7 @@ public class FileListController
    * @param recyclerView The RecyclerView for displaying files
    * @param swipeRefreshLayout The SwipeRefreshLayout for pull-to-refresh
    * @param emptyView The view to show when the file list is empty
+   * @param loadingView The view to show while a folder loads and there is no content yet
    * @param viewModel The FileListViewModel for business logic
    * @param uiState The shared UI state
    */
@@ -73,11 +79,13 @@ public class FileListController
       @NonNull RecyclerView recyclerView,
       @NonNull SwipeRefreshLayout swipeRefreshLayout,
       @NonNull View emptyView,
+      @NonNull View loadingView,
       @NonNull FileListViewModel viewModel,
       @NonNull FileBrowserUIState uiState) {
     this.recyclerView = recyclerView;
     this.swipeRefreshLayout = swipeRefreshLayout;
     this.emptyView = emptyView;
+    this.loadingView = loadingView;
     this.viewModel = viewModel;
     this.uiState = uiState;
 
@@ -130,7 +138,8 @@ public class FileListController
               // Propagate current selection state to adapter
               adapter.setSelectionMode(selectionMode);
               adapter.setSelectedPaths(selectedPaths);
-              updateEmptyView(files);
+              lastListSize = files.size();
+              updateViewState();
               swipeRefreshLayout.setRefreshing(false);
               // Refresh active upload indicators from DB
               refreshActiveUploadPaths();
@@ -143,6 +152,14 @@ public class FileListController
             getLifecycleOwner(),
             path -> {
               LogUtils.d("FileListController", "Current path updated: " + path);
+
+              // Drop the previous folder's rows so navigation shows the loading state
+              // instead of stale content (or a premature empty state)
+              if (!searchMode) {
+                adapter.setFiles(new java.util.ArrayList<>());
+                lastListSize = 0;
+                updateViewState();
+              }
 
               // If user navigated to a different folder while in multi-select, clear and exit
               // selection mode
@@ -162,20 +179,30 @@ public class FileListController
         .observe(
             getLifecycleOwner(),
             isLoading -> {
-              swipeRefreshLayout.setRefreshing(isLoading);
+              // The pull-to-refresh spinner only makes sense over existing content;
+              // with nothing to show yet, the dedicated loading state takes over
+              swipeRefreshLayout.setRefreshing(Boolean.TRUE.equals(isLoading) && lastListSize > 0);
+              updateViewState();
             });
   }
 
   /**
-   * Updates the empty view based on the file list.
-   *
-   * @param files The list of files
+   * Shows exactly one of the loading view, the empty view, or the list, based on the current
+   * loading state and list content.
    */
-  private void updateEmptyView(List<SmbFileItem> files) {
-    if (files.isEmpty()) {
+  private void updateViewState() {
+    boolean loading = Boolean.TRUE.equals(viewModel.isLoading().getValue());
+    boolean empty = lastListSize == 0;
+    if (loading && empty) {
+      loadingView.setVisibility(View.VISIBLE);
+      emptyView.setVisibility(View.GONE);
+      recyclerView.setVisibility(View.GONE);
+    } else if (empty) {
+      loadingView.setVisibility(View.GONE);
       emptyView.setVisibility(View.VISIBLE);
       recyclerView.setVisibility(View.GONE);
     } else {
+      loadingView.setVisibility(View.GONE);
       emptyView.setVisibility(View.GONE);
       recyclerView.setVisibility(View.VISIBLE);
     }
@@ -389,7 +416,8 @@ public class FileListController
   public void updateAdapter(@NonNull List<SmbFileItem> files) {
     LogUtils.d("FileListController", "Updating adapter with " + files.size() + " files");
     adapter.setFiles(files);
-    updateEmptyView(files);
+    lastListSize = files.size();
+    updateViewState();
   }
 
   // --- Selection mode APIs ---

@@ -63,10 +63,12 @@ public class FileListControllerSelectionTest {
     RecyclerView recyclerView = new RecyclerView(activity);
     SwipeRefreshLayout swipeRefresh = new SwipeRefreshLayout(activity);
     View emptyView = new View(activity);
+    View loadingView = new View(activity);
     FileBrowserUIState uiState = new FileBrowserUIState();
 
     controller =
-        new FileListController(recyclerView, swipeRefresh, emptyView, viewModel, uiState);
+        new FileListController(
+            recyclerView, swipeRefresh, emptyView, loadingView, viewModel, uiState);
 
     fileItem =
         new SmbFileItem("test.txt", "/share/test.txt", SmbFileItem.Type.FILE, 1024, new Date());
