@@ -112,7 +112,9 @@ public class FileBrowserActivity extends AppCompatActivity
   private View emptyView;
   private View loadingView;
   FloatingActionButton fab;
-  FloatingActionButton fabCreateFolder;
+  private View fabMenuScrim;
+  private View fabMenu;
+  private boolean fabMenuOpen = false;
   private FloatingActionButton fabMultiOptions;
   private FloatingActionButton fabSelectAll;
   private FloatingActionButton fabClearSelection;
@@ -352,6 +354,10 @@ public class FileBrowserActivity extends AppCompatActivity
               @Override
               public void handleOnBackPressed() {
                 LogUtils.d("FileBrowserActivity", "System back pressed (dispatcher)");
+                if (fabMenuOpen) {
+                  closeFabMenu();
+                  return;
+                }
                 if (searchViewModel != null && searchViewModel.isInSearchMode()) {
                   searchViewModel.cancelSearch();
                   fileListController.setSearchMode(false);
@@ -417,7 +423,8 @@ public class FileBrowserActivity extends AppCompatActivity
     emptyView = findViewById(R.id.empty_state);
     loadingView = findViewById(R.id.loading_state);
     fab = findViewById(R.id.fab);
-    fabCreateFolder = findViewById(R.id.fab_create_folder);
+    fabMenuScrim = findViewById(R.id.fab_menu_scrim);
+    fabMenu = findViewById(R.id.fab_menu);
     fabMultiOptions = findViewById(R.id.fab_multi_options);
     fabSelectAll = findViewById(R.id.fab_select_all);
     fabClearSelection = findViewById(R.id.fab_clear_selection);
@@ -537,17 +544,16 @@ public class FileBrowserActivity extends AppCompatActivity
                       && fileListController.isSelectionMode()
                       && selectionCount > 0;
               if (folderPickerMode) {
-                // In folder picker mode, keep regular FABs hidden
+                // In folder picker mode, keep the regular FAB hidden
                 fab.setVisibility(View.GONE);
-                fabCreateFolder.setVisibility(View.GONE);
+                closeFabMenu();
               } else if (selectionActive) {
-                // Keep regular FABs fully gone so they don't take space
+                // Keep the regular FAB fully gone so it doesn't take space
                 fab.setVisibility(View.GONE);
-                fabCreateFolder.setVisibility(View.GONE);
+                closeFabMenu();
               } else {
-                // Ensure upload and create-folder buttons are visible
+                // Ensure the action FAB is visible
                 if (!fab.isShown()) fab.show();
-                if (!fabCreateFolder.isShown()) fabCreateFolder.show();
               }
             });
 
@@ -828,18 +834,17 @@ public class FileBrowserActivity extends AppCompatActivity
           // Toggle FAB visibility for multi-select actions
           boolean showMultiFabs = fileListController.isSelectionMode() && selectionCount > 0;
           if (showMultiFabs) {
-            // Ensure regular FABs do not take space
+            // Ensure the regular FAB does not take space
             fab.setVisibility(View.GONE);
-            fabCreateFolder.setVisibility(View.GONE);
+            closeFabMenu();
             // Improve placement of multi-select FABs when regular ones are hidden
             adjustMultiSelectFabPlacement();
             if (fabMultiOptions.getVisibility() != View.VISIBLE) fabMultiOptions.show();
             if (fabSelectAll.getVisibility() != View.VISIBLE) fabSelectAll.show();
             if (fabClearSelection.getVisibility() != View.VISIBLE) fabClearSelection.show();
           } else {
-            // Restore default visibility of regular FABs
+            // Restore default visibility of the regular FAB
             fab.setVisibility(View.VISIBLE);
-            fabCreateFolder.setVisibility(View.VISIBLE);
             if (fabMultiOptions.isShown()) fabMultiOptions.hide();
             if (fabSelectAll.isShown()) fabSelectAll.hide();
             if (fabClearSelection.isShown()) fabClearSelection.hide();
@@ -901,21 +906,72 @@ public class FileBrowserActivity extends AppCompatActivity
     LogUtils.d("FileBrowserActivity", "Controller callbacks set up");
   }
 
+  /** Toggles the expanding FAB action menu. */
+  private void toggleFabMenu() {
+    if (fabMenuOpen) {
+      closeFabMenu();
+      return;
+    }
+    fabMenuOpen = true;
+    float slide = 24f * getResources().getDisplayMetrics().density;
+    fabMenuScrim.setAlpha(0f);
+    fabMenuScrim.setVisibility(View.VISIBLE);
+    fabMenuScrim.animate().alpha(1f).setDuration(150).start();
+    fabMenu.setAlpha(0f);
+    fabMenu.setTranslationY(slide);
+    fabMenu.setVisibility(View.VISIBLE);
+    fabMenu.animate().alpha(1f).translationY(0f).setDuration(150).start();
+    fab.animate().rotation(45f).setDuration(150).start();
+  }
+
+  /** Closes the expanding FAB action menu if it is open. */
+  private void closeFabMenu() {
+    if (!fabMenuOpen) {
+      return;
+    }
+    fabMenuOpen = false;
+    fabMenuScrim
+        .animate()
+        .alpha(0f)
+        .setDuration(120)
+        .withEndAction(() -> fabMenuScrim.setVisibility(View.GONE))
+        .start();
+    fabMenu
+        .animate()
+        .alpha(0f)
+        .setDuration(120)
+        .withEndAction(() -> fabMenu.setVisibility(View.GONE))
+        .start();
+    fab.animate().rotation(0f).setDuration(120).start();
+  }
+
   /** Sets up UI event listeners. */
   private void setupUIEventListeners() {
-    // Set up upload button (FAB)
+    // Main FAB toggles the expanding action menu
     fab.setOnClickListener(
         v -> {
           LogUtils.d("FileBrowserActivity", "Main FAB clicked");
-          dialogController.showUploadOptionsDialog();
+          toggleFabMenu();
         });
-
-    // Set up create folder button
-    fabCreateFolder.setOnClickListener(
-        v -> {
-          LogUtils.d("FileBrowserActivity", "Create folder button clicked");
-          dialogController.showCreateFolderDialog();
-        });
+    fabMenuScrim.setOnClickListener(v -> closeFabMenu());
+    findViewById(R.id.fab_action_create_folder)
+        .setOnClickListener(
+            v -> {
+              closeFabMenu();
+              dialogController.showCreateFolderDialog();
+            });
+    findViewById(R.id.fab_action_upload_file)
+        .setOnClickListener(
+            v -> {
+              closeFabMenu();
+              dialogController.triggerFileUpload();
+            });
+    findViewById(R.id.fab_action_upload_folder)
+        .setOnClickListener(
+            v -> {
+              closeFabMenu();
+              dialogController.triggerFolderContentsUpload();
+            });
 
     // Auto-hide/show FABs on scroll
     recyclerView.addOnScrollListener(
@@ -934,11 +990,10 @@ public class FileBrowserActivity extends AppCompatActivity
             if (dy > 0) {
               // Scrolling down -> hide
               if (fab.isShown()) fab.hide();
-              if (fabCreateFolder.isShown()) fabCreateFolder.hide();
+              closeFabMenu();
             } else if (dy < 0) {
               // Scrolling up -> show
               if (!fab.isShown()) fab.show();
-              if (!fabCreateFolder.isShown()) fabCreateFolder.show();
             }
           }
 
@@ -951,16 +1006,15 @@ public class FileBrowserActivity extends AppCompatActivity
                       && fileListController.isSelectionMode()
                       && selectionCount > 0;
               if (selectionActive) {
-                // Keep regular FABs gone during selection
+                // Keep the regular FAB gone during selection
                 fab.setVisibility(View.GONE);
-                fabCreateFolder.setVisibility(View.GONE);
+                closeFabMenu();
                 return;
               }
-              // If at top or idle, ensure FABs are visible
+              // If at top or idle, ensure the FAB is visible
               boolean canScrollUp = recyclerView.canScrollVertically(-1);
               if (!canScrollUp) {
                 if (!fab.isShown()) fab.show();
-                if (!fabCreateFolder.isShown()) fabCreateFolder.show();
               }
             }
           }
@@ -1060,7 +1114,7 @@ public class FileBrowserActivity extends AppCompatActivity
   private void setupFolderPickerMode() {
     LogUtils.d("FileBrowserActivity", "Setting up folder picker mode");
     fab.setVisibility(View.GONE);
-    fabCreateFolder.setVisibility(View.GONE);
+    closeFabMenu();
     fabSelectFolder.setVisibility(View.VISIBLE);
     fabSelectFolder.setOnClickListener(
         v -> {

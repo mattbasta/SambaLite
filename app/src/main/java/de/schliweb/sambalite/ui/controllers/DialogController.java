@@ -444,48 +444,26 @@ public class DialogController {
         });
   }
 
-  /** Shows a dialog for upload options. */
-  public void showUploadOptionsDialog() {
-    Context context = getContext();
-    if (context == null) return;
+  /** Starts the file-upload flow through the registered requester and callback. */
+  public void triggerFileUpload() {
+    LogUtils.d("DialogController", "File upload triggered");
+    if (fileOperationRequester != null) {
+      fileOperationRequester.requestFileUpload();
+    }
+    if (uploadCallback != null) {
+      uploadCallback.onFileUploadRequested();
+    }
+  }
 
-    LogUtils.d("DialogController", "Showing upload options dialog");
-
-    String[] options =
-        new String[] {
-          context.getString(R.string.upload), context.getString(R.string.zip_download_folder)
-        };
-
-    new MaterialAlertDialogBuilder(context)
-        .setTitle(R.string.upload)
-        .setItems(
-            options,
-            (dialog, which) -> {
-              switch (which) {
-                case 0: // Upload file
-                  // First request the file upload operation through the requester
-                  if (fileOperationRequester != null) {
-                    fileOperationRequester.requestFileUpload();
-                  }
-                  // Then call the callback to handle the actual upload
-                  if (uploadCallback != null) {
-                    uploadCallback.onFileUploadRequested();
-                  }
-                  break;
-                case 1: // Upload folder contents
-                  // First request the folder contents upload operation through the requester
-                  if (fileOperationRequester != null) {
-                    fileOperationRequester.requestFolderContentsUpload();
-                  }
-                  // Then call the callback to handle the actual upload
-                  if (uploadCallback != null) {
-                    uploadCallback.onFolderContentsUploadRequested();
-                  }
-                  break;
-              }
-            })
-        .setNegativeButton(R.string.cancel, null)
-        .show();
+  /** Starts the folder-contents-upload flow through the registered requester and callback. */
+  public void triggerFolderContentsUpload() {
+    LogUtils.d("DialogController", "Folder contents upload triggered");
+    if (fileOperationRequester != null) {
+      fileOperationRequester.requestFolderContentsUpload();
+    }
+    if (uploadCallback != null) {
+      uploadCallback.onFolderContentsUploadRequested();
+    }
   }
 
   /**
