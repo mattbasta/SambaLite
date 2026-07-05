@@ -132,6 +132,9 @@ public class SambaLiteApp extends Application implements Configuration.Provider 
   public void onCreate() {
     super.onCreate();
 
+    // Apply Material You dynamic colors on Android 12+; older devices keep the static palette
+    com.google.android.material.color.DynamicColors.applyToActivitiesIfAvailable(this);
+
     LogUtils.i("SambaLiteApp", "Starting SambaLite application initialization");
 
     try {

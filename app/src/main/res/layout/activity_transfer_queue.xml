@@ -17,10 +17,7 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="?attr/colorPrimary"
-            app:titleTextColor="?attr/colorOnPrimary"
-            app:subtitleTextColor="?attr/colorOnPrimary"
-            app:navigationIconTint="?attr/colorOnPrimary"
+            android:background="?attr/colorSurface"
             app:navigationIcon="?attr/homeAsUpIndicator"
             app:title="@string/transfer_queue_title" />
 
@@ -248,9 +245,7 @@
         android:contentDescription="@string/download_selected"
         android:visibility="gone"
         android:src="@drawable/ic_menu_selectall"
-        app:backgroundTint="#3DB7DC"
-        app:tint="#FFFFFF"
-        app:rippleColor="#693DB7DC" />
+        />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fab_clear_selection"
@@ -262,9 +257,7 @@
         android:contentDescription="@string/clear_selection"
         android:visibility="gone"
         android:src="@drawable/ic_menu_unselectall"
-        app:backgroundTint="#3DB7DC"
-        app:tint="#FFFFFF"
-        app:rippleColor="#693DB7DC" />
+        />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fab_multi_options"
@@ -276,9 +269,7 @@
         android:contentDescription="@string/multi_select_options"
         android:visibility="gone"
         android:src="@drawable/ic_menu_more"
-        app:backgroundTint="#3DB7DC"
-        app:tint="#FFFFFF"
-        app:rippleColor="#693DB7DC" />
+        />
 
     <!-- Enhanced empty state (matching FileBrowser style) -->
     <LinearLayout

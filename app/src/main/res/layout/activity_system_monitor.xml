@@ -16,10 +16,8 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="?attr/colorPrimary"
-            app:title="System Monitor"
-            app:titleTextColor="?attr/colorOnPrimary"
-            app:popupTheme="@style/ThemeOverlay.AppCompat.Light" />
+            android:background="?attr/colorSurface"
+            app:title="System Monitor" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
