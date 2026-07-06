@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingBottom="24dp">
+
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="24dp"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="0dp"
+        app:cardBackgroundColor="?attr/colorSurfaceVariant">
+
+        <ImageView
+            android:id="@+id/info_icon"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            app:tint="?attr/colorOnSurfaceVariant"
+            tools:src="@android:drawable/ic_menu_gallery" />
+
+    </com.google.android.material.card.MaterialCardView>
+
+    <TextView
+        android:id="@+id/info_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:paddingHorizontal="24dp"
+        android:gravity="center"
+        android:textAppearance="?attr/textAppearanceTitleMedium"
+        android:textColor="?attr/colorOnSurface"
+        android:maxLines="2"
+        android:ellipsize="middle"
+        tools:text="Important Document.pdf" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="16dp"
+        android:background="?attr/colorOutlineVariant" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="24dp"
+        android:paddingTop="16dp"
+        android:paddingBottom="6dp">
+
+        <TextView
+            style="@style/FileInfoLabel"
+            android:text="@string/info_type" />
+
+        <TextView
+            android:id="@+id/info_type_value"
+            style="@style/FileInfoValue"
+            tools:text="PDF file" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="24dp"
+        android:paddingVertical="6dp">
+
+        <TextView
+            style="@style/FileInfoLabel"
+            android:text="@string/info_location" />
+
+        <TextView
+            android:id="@+id/info_location_value"
+            style="@style/FileInfoValue"
+            tools:text="share/documents/reports" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/info_size_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="24dp"
+        android:paddingVertical="6dp">
+
+        <TextView
+            style="@style/FileInfoLabel"
+            android:text="@string/info_size" />
+
+        <TextView
+            android:id="@+id/info_size_value"
+            style="@style/FileInfoValue"
+            tools:text="2.4 MB" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="24dp"
+        android:paddingVertical="6dp">
+
+        <TextView
+            style="@style/FileInfoLabel"
+            android:text="@string/info_modified" />
+
+        <TextView
+            android:id="@+id/info_modified_value"
+            style="@style/FileInfoValue"
+            tools:text="Mar 15, 2024 14:32" />
+
+    </LinearLayout>
+
+</LinearLayout>

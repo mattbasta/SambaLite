@@ -116,111 +116,184 @@ public class DialogController {
   }
 
   /**
-   * Shows a dialog with options for a file.
+   * Shows the bottom action sheet for a file or folder: header with icon and name, then the
+   * available actions.
    *
-   * @param file The file to show options for
+   * @param file The file to show actions for
    */
   public void showFileOptionsDialog(@NonNull SmbFileItem file) {
     Context context = getContext();
     if (context == null) return;
 
-    LogUtils.d("DialogController", "Showing file options dialog for: " + file.getName());
+    LogUtils.d("DialogController", "Showing file actions sheet for: " + file.getName());
 
     // Store the selected file in the UI state
     uiState.setSelectedFile(file);
 
-    String[] options;
-    if (file.isDirectory()) {
-      // Check if this folder already has a sync config
-      boolean hasSyncConfig = folderSyncCallback != null && folderSyncCallback.hasSyncConfig(file);
-      if (hasSyncConfig) {
-        options =
-            new String[] {
-              context.getString(R.string.download),
-              context.getString(R.string.rename),
-              context.getString(R.string.delete),
-              context.getString(R.string.sync_now),
-              context.getString(R.string.sync_edit_option),
-              context.getString(R.string.sync_remove_option)
-            };
-      } else {
-        options =
-            new String[] {
-              context.getString(R.string.download),
-              context.getString(R.string.rename),
-              context.getString(R.string.delete),
-              context.getString(R.string.sync_folder_option)
-            };
-      }
-    } else {
-      options =
-          new String[] {
-            context.getString(R.string.open_file),
-            context.getString(R.string.download),
-            context.getString(R.string.rename),
-            context.getString(R.string.delete)
-          };
-    }
+    com.google.android.material.bottomsheet.BottomSheetDialog sheet =
+        new com.google.android.material.bottomsheet.BottomSheetDialog(context);
+    android.view.View content =
+        android.view.LayoutInflater.from(context).inflate(R.layout.bottom_sheet_file_actions, null);
+    sheet.setContentView(content);
 
-    new MaterialAlertDialogBuilder(context)
-        .setTitle(file.getName())
-        .setItems(
-            options,
-            (dialog, which) -> {
-              // For non-directory files, options are shifted by 1 due to "Open" at index 0
-              int adjustedWhich = !file.isDirectory() ? which - 1 : which;
-              if (!file.isDirectory() && which == 0) {
-                // Open file
-                if (fileOpenCallback != null) {
-                  fileOpenCallback.onOpenRequested(file);
-                }
-                return;
-              }
-              switch (adjustedWhich) {
-                case 0: // Download
-                  if (fileOperationCallback != null) {
-                    fileOperationCallback.onDownloadRequested(file);
-                  }
-                  break;
-                case 1: // Rename
-                  // First request the rename operation through the requester
-                  if (fileOperationRequester != null) {
-                    fileOperationRequester.requestFileRename(file);
-                  }
-                  // Then show the rename dialog
-                  showRenameFileDialog(file);
-                  break;
-                case 2: // Delete
-                  // Request the delete operation through the requester
-                  // The requester will show the confirmation dialog
-                  if (fileOperationRequester != null) {
-                    fileOperationRequester.requestFileDeletion(file);
-                  }
-                  break;
-                case 3: // Sync now or setup (only for directories)
-                  if (folderSyncCallback != null) {
-                    boolean hasSync = folderSyncCallback.hasSyncConfig(file);
-                    if (hasSync) {
-                      folderSyncCallback.onSyncNowRequested(file);
-                    } else {
-                      folderSyncCallback.onSetupSyncRequested(file);
-                    }
-                  }
-                  break;
-                case 4: // Sync edit (only for directories with sync)
-                  if (folderSyncCallback != null) {
-                    folderSyncCallback.onEditSyncRequested(file);
-                  }
-                  break;
-                case 5: // Sync remove (only for directories with sync)
-                  if (folderSyncCallback != null) {
-                    folderSyncCallback.onRemoveSyncRequested(file);
-                  }
-                  break;
-              }
-            })
-        .setNegativeButton(R.string.cancel, null)
-        .show();
+    android.widget.ImageView icon = content.findViewById(R.id.sheet_file_icon);
+    android.widget.TextView name = content.findViewById(R.id.sheet_file_name);
+    name.setText(file.getName());
+    icon.setImageResource(
+        file.isDirectory()
+            ? android.R.drawable.ic_menu_more
+            : de.schliweb.sambalite.ui.FileAdapter.getFileIcon(file.getName()));
+
+    boolean canSync = file.isDirectory() && folderSyncCallback != null;
+    boolean hasSync = canSync && folderSyncCallback.hasSyncConfig(file);
+
+    bindSheetAction(
+        sheet,
+        content,
+        R.id.action_open,
+        !file.isDirectory(),
+        () -> {
+          if (fileOpenCallback != null) {
+            fileOpenCallback.onOpenRequested(file);
+          }
+        });
+    bindSheetAction(
+        sheet,
+        content,
+        R.id.action_download,
+        true,
+        () -> {
+          if (fileOperationCallback != null) {
+            fileOperationCallback.onDownloadRequested(file);
+          }
+        });
+    bindSheetAction(
+        sheet,
+        content,
+        R.id.action_rename,
+        true,
+        () -> {
+          if (fileOperationRequester != null) {
+            fileOperationRequester.requestFileRename(file);
+          }
+          showRenameFileDialog(file);
+        });
+    bindSheetAction(sheet, content, R.id.action_info, true, () -> showFileInfoSheet(file));
+    bindSheetAction(
+        sheet,
+        content,
+        R.id.action_sync_setup,
+        canSync && !hasSync,
+        () -> folderSyncCallback.onSetupSyncRequested(file));
+    bindSheetAction(
+        sheet,
+        content,
+        R.id.action_sync_now,
+        hasSync,
+        () -> folderSyncCallback.onSyncNowRequested(file));
+    bindSheetAction(
+        sheet,
+        content,
+        R.id.action_sync_edit,
+        hasSync,
+        () -> folderSyncCallback.onEditSyncRequested(file));
+    bindSheetAction(
+        sheet,
+        content,
+        R.id.action_sync_remove,
+        hasSync,
+        () -> folderSyncCallback.onRemoveSyncRequested(file));
+    bindSheetAction(
+        sheet,
+        content,
+        R.id.action_delete,
+        true,
+        () -> {
+          // The requester shows the delete confirmation dialog
+          if (fileOperationRequester != null) {
+            fileOperationRequester.requestFileDeletion(file);
+          }
+        });
+
+    sheet.show();
+  }
+
+  /** Shows or hides one action row and wires its click to dismiss the sheet and run the action. */
+  private void bindSheetAction(
+      com.google.android.material.bottomsheet.BottomSheetDialog sheet,
+      android.view.View content,
+      int rowId,
+      boolean visible,
+      Runnable action) {
+    android.view.View row = content.findViewById(rowId);
+    if (row == null) return;
+    row.setVisibility(visible ? android.view.View.VISIBLE : android.view.View.GONE);
+    if (visible) {
+      row.setOnClickListener(
+          v -> {
+            sheet.dismiss();
+            action.run();
+          });
+    }
+  }
+
+  /**
+   * Shows the file information sheet: icon, name, type, location, size (files only), and last
+   * modified time.
+   */
+  public void showFileInfoSheet(@NonNull SmbFileItem file) {
+    Context context = getContext();
+    if (context == null) return;
+
+    LogUtils.d("DialogController", "Showing file info sheet for: " + file.getName());
+
+    com.google.android.material.bottomsheet.BottomSheetDialog sheet =
+        new com.google.android.material.bottomsheet.BottomSheetDialog(context);
+    android.view.View content =
+        android.view.LayoutInflater.from(context).inflate(R.layout.bottom_sheet_file_info, null);
+    sheet.setContentView(content);
+
+    android.widget.ImageView icon = content.findViewById(R.id.info_icon);
+    android.widget.TextView name = content.findViewById(R.id.info_name);
+    android.widget.TextView typeValue = content.findViewById(R.id.info_type_value);
+    android.widget.TextView locationValue = content.findViewById(R.id.info_location_value);
+    android.view.View sizeRow = content.findViewById(R.id.info_size_row);
+    android.widget.TextView sizeValue = content.findViewById(R.id.info_size_value);
+    android.widget.TextView modifiedValue = content.findViewById(R.id.info_modified_value);
+
+    icon.setImageResource(
+        file.isDirectory()
+            ? android.R.drawable.ic_menu_more
+            : de.schliweb.sambalite.ui.FileAdapter.getFileIcon(file.getName()));
+    name.setText(file.getName());
+    typeValue.setText(describeFileType(context, file));
+    locationValue.setText(file.getPath());
+    if (file.isFile()) {
+      sizeRow.setVisibility(android.view.View.VISIBLE);
+      sizeValue.setText(android.text.format.Formatter.formatFileSize(context, file.getSize()));
+    } else {
+      sizeRow.setVisibility(android.view.View.GONE);
+    }
+    modifiedValue.setText(
+        file.getLastModified() != null
+            ? android.text.format.DateFormat.format("MMM dd, yyyy HH:mm", file.getLastModified())
+            : "—");
+
+    sheet.show();
+  }
+
+  /** Human-readable type: "Folder", "PDF file", or plain "File" without an extension. */
+  private String describeFileType(Context context, SmbFileItem file) {
+    if (file.isDirectory()) {
+      return context.getString(R.string.info_type_folder);
+    }
+    String fileName = file.getName();
+    int dot = fileName != null ? fileName.lastIndexOf('.') : -1;
+    if (dot >= 0 && dot < fileName.length() - 1) {
+      String ext = fileName.substring(dot + 1).toUpperCase(java.util.Locale.ROOT);
+      return context.getString(R.string.info_type_file_with_ext, ext);
+    }
+    return context.getString(R.string.info_type_file);
   }
 
   /**

@@ -324,7 +324,7 @@ public class FileAdapter extends RecyclerView.Adapter<FileAdapter.FileViewHolder
    * @param filename The name of the file
    * @return Resource ID for the appropriate icon
    */
-  int getFileIcon(String filename) {
+  public static int getFileIcon(String filename) {
     if (filename == null) {
       return android.R.drawable.ic_menu_save;
     }

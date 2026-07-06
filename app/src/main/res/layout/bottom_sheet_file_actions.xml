@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingBottom="16dp">
+
+    <!-- Header: file icon + name -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="20dp"
+        android:paddingVertical="16dp">
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            app:cardCornerRadius="8dp"
+            app:cardElevation="0dp"
+            app:cardBackgroundColor="?attr/colorSurfaceVariant">
+
+            <ImageView
+                android:id="@+id/sheet_file_icon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:importantForAccessibility="no"
+                app:tint="?attr/colorOnSurfaceVariant"
+                tools:src="@android:drawable/ic_menu_gallery" />
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            android:id="@+id/sheet_file_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textColor="?attr/colorOnSurface"
+            android:maxLines="2"
+            android:ellipsize="middle"
+            tools:text="Important Document.pdf" />
+
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="?attr/colorOutlineVariant" />
+
+    <TextView
+        android:id="@+id/action_open"
+        style="@style/FileActionRow"
+        android:text="@string/open_file"
+        app:drawableStartCompat="@android:drawable/ic_menu_view" />
+
+    <TextView
+        android:id="@+id/action_download"
+        style="@style/FileActionRow"
+        android:text="@string/download"
+        app:drawableStartCompat="@android:drawable/ic_menu_save" />
+
+    <TextView
+        android:id="@+id/action_rename"
+        style="@style/FileActionRow"
+        android:text="@string/rename"
+        app:drawableStartCompat="@android:drawable/ic_menu_edit" />
+
+    <TextView
+        android:id="@+id/action_info"
+        style="@style/FileActionRow"
+        android:text="@string/view_information"
+        app:drawableStartCompat="@android:drawable/ic_menu_info_details" />
+
+    <TextView
+        android:id="@+id/action_sync_setup"
+        style="@style/FileActionRow"
+        android:text="@string/sync_folder_option"
+        app:drawableStartCompat="@android:drawable/ic_popup_sync" />
+
+    <TextView
+        android:id="@+id/action_sync_now"
+        style="@style/FileActionRow"
+        android:text="@string/sync_now"
+        app:drawableStartCompat="@android:drawable/ic_popup_sync" />
+
+    <TextView
+        android:id="@+id/action_sync_edit"
+        style="@style/FileActionRow"
+        android:text="@string/sync_edit_option"
+        app:drawableStartCompat="@android:drawable/ic_menu_manage" />
+
+    <TextView
+        android:id="@+id/action_sync_remove"
+        style="@style/FileActionRow"
+        android:text="@string/sync_remove_option"
+        app:drawableStartCompat="@android:drawable/ic_menu_close_clear_cancel" />
+
+    <TextView
+        android:id="@+id/action_delete"
+        style="@style/FileActionRow"
+        android:text="@string/delete"
+        app:drawableStartCompat="@android:drawable/ic_menu_delete" />
+
+</LinearLayout>
