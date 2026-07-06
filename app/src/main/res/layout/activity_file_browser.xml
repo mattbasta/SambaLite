@@ -126,138 +126,100 @@
         android:focusable="true"
         android:visibility="gone" />
 
-    <!-- Expanding FAB action menu (labels + mini FABs, GDrive-style) -->
+    <!-- Expanding FAB action menu: labeled pills, right-aligned with the main button -->
     <LinearLayout
         android:id="@+id/fab_menu"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
-        android:layout_marginEnd="24dp"
+        android:layout_marginEnd="16dp"
         android:layout_marginBottom="100dp"
         android:orientation="vertical"
         android:gravity="end"
         android:visibility="gone">
 
-        <LinearLayout
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/fab_action_create_folder"
+            style="@style/Widget.Material3.Button.TonalButton.Icon"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:minHeight="56dp"
+            android:paddingHorizontal="20dp"
+            app:cornerRadius="28dp"
+            app:iconSize="24dp"
+            app:iconPadding="12dp"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            app:icon="@android:drawable/ic_menu_agenda"
+            android:text="@string/create_folder" />
 
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="12dp"
-                app:cardCornerRadius="8dp"
-                app:cardElevation="2dp"
-                app:cardBackgroundColor="?attr/colorSurface">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:paddingHorizontal="12dp"
-                    android:paddingVertical="6dp"
-                    android:text="@string/create_folder"
-                    android:textAppearance="?attr/textAppearanceLabelLarge"
-                    android:textColor="?attr/colorOnSurface" />
-
-            </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/fab_action_create_folder"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:fabSize="mini"
-                android:contentDescription="@string/create_folder"
-                android:src="@android:drawable/ic_menu_agenda" />
-
-        </LinearLayout>
-
-        <LinearLayout
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/fab_action_upload_folder"
+            style="@style/Widget.Material3.Button.TonalButton.Icon"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:minHeight="56dp"
+            android:paddingHorizontal="20dp"
+            app:cornerRadius="28dp"
+            app:iconSize="24dp"
+            app:iconPadding="12dp"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            app:icon="@drawable/ic_sync_upload"
+            android:text="@string/zip_download_folder" />
 
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="12dp"
-                app:cardCornerRadius="8dp"
-                app:cardElevation="2dp"
-                app:cardBackgroundColor="?attr/colorSurface">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:paddingHorizontal="12dp"
-                    android:paddingVertical="6dp"
-                    android:text="@string/zip_download_folder"
-                    android:textAppearance="?attr/textAppearanceLabelLarge"
-                    android:textColor="?attr/colorOnSurface" />
-
-            </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/fab_action_upload_folder"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:fabSize="mini"
-                android:contentDescription="@string/zip_download_folder"
-                android:src="@drawable/ic_sync_upload" />
-
-        </LinearLayout>
-
-        <LinearLayout
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/fab_action_upload_file"
+            style="@style/Widget.Material3.Button.TonalButton.Icon"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="12dp"
-                app:cardCornerRadius="8dp"
-                app:cardElevation="2dp"
-                app:cardBackgroundColor="?attr/colorSurface">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:paddingHorizontal="12dp"
-                    android:paddingVertical="6dp"
-                    android:text="@string/upload_files"
-                    android:textAppearance="?attr/textAppearanceLabelLarge"
-                    android:textColor="?attr/colorOnSurface" />
-
-            </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/fab_action_upload_file"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:fabSize="mini"
-                android:contentDescription="@string/upload_files"
-                android:src="@android:drawable/ic_menu_upload" />
-
-        </LinearLayout>
+            android:minHeight="56dp"
+            android:paddingHorizontal="20dp"
+            app:cornerRadius="28dp"
+            app:iconSize="24dp"
+            app:iconPadding="12dp"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            app:icon="@android:drawable/ic_menu_upload"
+            android:text="@string/upload_files" />
 
     </LinearLayout>
 
-    <!-- Main FAB: toggles the action menu -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
+    <!-- Main FAB: a rounded square that morphs into a circle while the menu is open -->
+    <com.google.android.material.card.MaterialCardView
         android:id="@+id/fab"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
         android:layout_gravity="bottom|end"
         android:layout_marginEnd="16dp"
         android:layout_marginBottom="32dp"
-        android:contentDescription="@string/upload_files"
-        android:src="@android:drawable/ic_input_add"
-        />
+        app:cardCornerRadius="24dp"
+        app:cardElevation="6dp"
+        app:cardBackgroundColor="?attr/colorPrimaryContainer"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?attr/selectableItemBackground"
+        android:contentDescription="@string/upload_files">
+
+        <ImageView
+            android:id="@+id/fab_icon_plus"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:src="@android:drawable/ic_input_add"
+            app:tint="?attr/colorOnPrimaryContainer" />
+
+        <ImageView
+            android:id="@+id/fab_icon_close"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center"
+            android:alpha="0"
+            android:importantForAccessibility="no"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            app:tint="?attr/colorOnPrimary" />
+
+    </com.google.android.material.card.MaterialCardView>
 
     <!-- Multi-select FABs: only visible in selection mode -->
     <!-- Order top to bottom: Select All (304dp) → Unselect (240dp) → Action (176dp) -->

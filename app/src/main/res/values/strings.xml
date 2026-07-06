@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">SambaLite</string>
-    <string name="add_connection">Add Connection</string>
-    <string name="system_monitor">System Monitor</string>
+    <string name="add_connection">Add connection</string>
+    <string name="system_monitor">System monitor</string>
    
     <!-- Welcome Screen -->
     <string name="welcome_title">Welcome to SambaLite</string>
     <string name="welcome_subtitle">Connect to your SMB/CIFS shares easily and securely.</string>
-    <string name="your_connections">Your Connections</string>
-    <string name="your_folder_syncs">Your Folder Syncs</string>
+    <string name="your_connections">Your connections</string>
+    <string name="your_folder_syncs">Your folder syncs</string>
 
     <!-- Content Descriptions for Accessibility -->
     <string name="content_desc_connection_status">Connection Status</string>
@@ -88,8 +88,8 @@
     <string name="overwrite">Overwrite</string>
 
     <!-- Folder Creation -->
-    <string name="create_folder">Create Folder</string>
-    <string name="create_folder_dialog_title">Create New Folder</string>
+    <string name="create_folder">Create folder</string>
+    <string name="create_folder_dialog_title">Create new folder</string>
     <string name="folder_name">Folder Name</string>
     <string name="folder_created">Folder created successfully</string>
     <string name="folder_creation_error">Error creating folder</string>
@@ -391,7 +391,7 @@
     <string name="auth_failed">Authentication failed: %s</string>
 
     <!-- Transfer Queue -->
-    <string name="transfer_queue_title">Transfer Queue</string>
+    <string name="transfer_queue_title">Transfer queue</string>
     <string name="transfer_queue_empty">No transfers in queue</string>
     <string name="transfer_retry">Retry</string>
     <string name="transfer_remove">Remove</string>
