@@ -32,13 +32,14 @@
         <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="16dp">
+            android:paddingVertical="16dp">
 
             <!-- Welcome Card when no connections -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/welcome_card"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
                 android:layout_marginBottom="16dp"
                 android:visibility="visible"
                 app:cardElevation="4dp"
@@ -89,6 +90,7 @@
                 android:id="@+id/connections_header"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:paddingHorizontal="16dp"
                 android:layout_marginTop="8dp"
                 android:layout_marginBottom="12dp"
                 android:text="@string/your_connections"
@@ -118,6 +120,7 @@
                 android:id="@+id/sync_header"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:paddingHorizontal="16dp"
                 android:layout_marginTop="24dp"
                 android:layout_marginBottom="12dp"
                 android:text="@string/your_folder_syncs"
