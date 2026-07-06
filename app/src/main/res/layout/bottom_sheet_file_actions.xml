@@ -57,54 +57,54 @@
         android:id="@+id/action_open"
         style="@style/FileActionRow"
         android:text="@string/open_file"
-        app:drawableStartCompat="@android:drawable/ic_menu_view" />
+        app:drawableStartCompat="@drawable/ic_open_external" />
 
     <TextView
         android:id="@+id/action_download"
         style="@style/FileActionRow"
         android:text="@string/download"
-        app:drawableStartCompat="@android:drawable/ic_menu_save" />
+        app:drawableStartCompat="@drawable/ic_download" />
 
     <TextView
         android:id="@+id/action_rename"
         style="@style/FileActionRow"
         android:text="@string/rename"
-        app:drawableStartCompat="@android:drawable/ic_menu_edit" />
+        app:drawableStartCompat="@drawable/ic_rename" />
 
     <TextView
         android:id="@+id/action_info"
         style="@style/FileActionRow"
         android:text="@string/view_information"
-        app:drawableStartCompat="@android:drawable/ic_menu_info_details" />
+        app:drawableStartCompat="@drawable/ic_info" />
 
     <TextView
         android:id="@+id/action_sync_setup"
         style="@style/FileActionRow"
         android:text="@string/sync_folder_option"
-        app:drawableStartCompat="@android:drawable/ic_popup_sync" />
+        app:drawableStartCompat="@drawable/ic_sync" />
 
     <TextView
         android:id="@+id/action_sync_now"
         style="@style/FileActionRow"
         android:text="@string/sync_now"
-        app:drawableStartCompat="@android:drawable/ic_popup_sync" />
+        app:drawableStartCompat="@drawable/ic_sync" />
 
     <TextView
         android:id="@+id/action_sync_edit"
         style="@style/FileActionRow"
         android:text="@string/sync_edit_option"
-        app:drawableStartCompat="@android:drawable/ic_menu_manage" />
+        app:drawableStartCompat="@drawable/ic_rename" />
 
     <TextView
         android:id="@+id/action_sync_remove"
         style="@style/FileActionRow"
         android:text="@string/sync_remove_option"
-        app:drawableStartCompat="@android:drawable/ic_menu_close_clear_cancel" />
+        app:drawableStartCompat="@drawable/ic_close" />
 
     <TextView
         android:id="@+id/action_delete"
         style="@style/FileActionRow"
         android:text="@string/delete"
-        app:drawableStartCompat="@android:drawable/ic_menu_delete" />
+        app:drawableStartCompat="@drawable/ic_delete" />
 
 </LinearLayout>

@@ -326,63 +326,64 @@ public class FileAdapter extends RecyclerView.Adapter<FileAdapter.FileViewHolder
    */
   public static int getFileIcon(String filename) {
     if (filename == null) {
-      return android.R.drawable.ic_menu_save;
+      return R.drawable.ic_file_generic;
     }
 
     String extension = EnhancedFileUtils.getFileExtension(filename).toLowerCase(Locale.ROOT);
 
     switch (extension) {
       case "pdf":
-        return android.R.drawable.ic_menu_report_image;
+        return R.drawable.ic_file_pdf;
       case "txt":
       case "md":
       case "log":
-        return android.R.drawable.ic_menu_edit;
+      case "doc":
+      case "docx":
+      case "odt":
+        return R.drawable.ic_file_document;
       case "jpg":
       case "jpeg":
       case "png":
       case "gif":
       case "bmp":
       case "webp":
-        return android.R.drawable.ic_menu_gallery;
+      case "heic":
+        return R.drawable.ic_file_image;
       case "mp4":
       case "avi":
       case "mkv":
       case "mov":
       case "wmv":
-        return android.R.drawable.ic_menu_slideshow;
+        return R.drawable.ic_file_video;
       case "mp3":
       case "wav":
       case "flac":
       case "ogg":
       case "m4a":
-        return android.R.drawable.ic_media_play;
+        return R.drawable.ic_file_audio;
       case "zip":
       case "rar":
       case "7z":
       case "tar":
       case "gz":
-        return android.R.drawable.ic_menu_compass;
-      case "doc":
-      case "docx":
-      case "odt":
-        return android.R.drawable.ic_menu_edit;
+        return R.drawable.ic_file_archive;
       case "xls":
       case "xlsx":
       case "ods":
-        return android.R.drawable.ic_menu_view;
+      case "csv":
+        return R.drawable.ic_file_spreadsheet;
       case "ppt":
       case "pptx":
       case "odp":
-        return android.R.drawable.ic_menu_slideshow;
+        return R.drawable.ic_file_presentation;
       case "exe":
       case "msi":
       case "deb":
       case "rpm":
       case "apk":
-        return android.R.drawable.ic_menu_preferences;
+        return R.drawable.ic_file_executable;
       default:
-        return android.R.drawable.ic_menu_save;
+        return R.drawable.ic_file_generic;
     }
   }
 
@@ -411,6 +412,7 @@ public class FileAdapter extends RecyclerView.Adapter<FileAdapter.FileViewHolder
     private final TextView nameView;
     private final TextView dateView;
     private final TextView sizeView;
+    private final View detailDot;
     private final ImageButton moreOptionsButton;
     private final MaterialCardView rootCard;
     private final View syncIndicator;
@@ -425,6 +427,7 @@ public class FileAdapter extends RecyclerView.Adapter<FileAdapter.FileViewHolder
       nameView = itemView.findViewById(R.id.file_name);
       dateView = itemView.findViewById(R.id.file_date);
       sizeView = itemView.findViewById(R.id.file_size);
+      detailDot = itemView.findViewById(R.id.file_detail_dot);
       moreOptionsButton = itemView.findViewById(R.id.more_options);
       rootCard = (itemView instanceof MaterialCardView matched) ? matched : null;
       syncIndicator = itemView.findViewById(R.id.sync_indicator);
@@ -550,6 +553,9 @@ public class FileAdapter extends RecyclerView.Adapter<FileAdapter.FileViewHolder
         nameView.setText(R.string.parent_directory);
         dateView.setText("");
         sizeView.setText("");
+        if (detailDot != null) {
+          detailDot.setVisibility(View.GONE);
+        }
         if (syncIndicator != null) {
           syncIndicator.setVisibility(View.GONE);
         }
@@ -610,7 +616,7 @@ public class FileAdapter extends RecyclerView.Adapter<FileAdapter.FileViewHolder
         iconView.setTag(null);
         if (file.isDirectory()) {
           LogUtils.d("FileAdapter", "Setting directory icon for: " + file.getName());
-          iconView.setImageResource(android.R.drawable.ic_menu_more);
+          iconView.setImageResource(R.drawable.ic_folder);
         } else {
           LogUtils.d("FileAdapter", "Setting file icon for: " + file.getName());
           iconView.setImageResource(getFileIcon(file.getName()));
@@ -638,6 +644,12 @@ public class FileAdapter extends RecyclerView.Adapter<FileAdapter.FileViewHolder
       } else {
         LogUtils.d("FileAdapter", "No size for directory: " + file.getName());
         sizeView.setText("");
+      }
+
+      // The date/size separator dot only makes sense when both values are shown
+      if (detailDot != null) {
+        boolean showDot = file.isFile() && file.getLastModified() != null;
+        detailDot.setVisibility(showDot ? View.VISIBLE : View.GONE);
       }
 
       // Show sync direction indicator

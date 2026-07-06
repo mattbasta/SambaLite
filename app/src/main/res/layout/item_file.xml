@@ -76,6 +76,7 @@
             tools:text="Mar 15, 2024" />
 
         <View
+            android:id="@+id/file_detail_dot"
             android:layout_width="4dp"
             android:layout_height="4dp"
             android:layout_gravity="center_vertical"
@@ -143,7 +144,7 @@
         android:layout_width="40dp"
         android:layout_height="40dp"
         android:contentDescription="@string/content_desc_more_options"
-        android:src="@android:drawable/ic_menu_more"
+        android:src="@drawable/ic_menu_more"
         android:background="?attr/selectableItemBackgroundBorderless"
         app:tint="?attr/colorOnSurfaceVariant"
         app:layout_constraintEnd_toEndOf="parent"
