@@ -51,6 +51,10 @@ public class FileListController
   // view-state decision without racing the adapter's async DiffUtil updates
   private int lastListSize = 0;
 
+  // True from folder navigation until its file list arrives; keeps the loading view up during
+  // the gap before the ViewModel flips isLoading to true (would otherwise flash the empty state)
+  private boolean awaitingNavigation = false;
+
   // Search mode flag – when true, the getFiles() observer will not overwrite search results
   @Getter @Setter private boolean searchMode = false;
 
@@ -139,6 +143,7 @@ public class FileListController
               adapter.setSelectionMode(selectionMode);
               adapter.setSelectedPaths(selectedPaths);
               lastListSize = files.size();
+              awaitingNavigation = false;
               updateViewState();
               swipeRefreshLayout.setRefreshing(false);
               // Refresh active upload indicators from DB
@@ -158,6 +163,7 @@ public class FileListController
               if (!searchMode) {
                 adapter.setFiles(new java.util.ArrayList<>());
                 lastListSize = 0;
+                awaitingNavigation = true;
                 updateViewState();
               }
 
@@ -191,7 +197,7 @@ public class FileListController
    * loading state and list content.
    */
   private void updateViewState() {
-    boolean loading = Boolean.TRUE.equals(viewModel.isLoading().getValue());
+    boolean loading = awaitingNavigation || Boolean.TRUE.equals(viewModel.isLoading().getValue());
     boolean empty = lastListSize == 0;
     if (loading && empty) {
       loadingView.setVisibility(View.VISIBLE);
@@ -417,6 +423,7 @@ public class FileListController
     LogUtils.d("FileListController", "Updating adapter with " + files.size() + " files");
     adapter.setFiles(files);
     lastListSize = files.size();
+    awaitingNavigation = false;
     updateViewState();
   }
 
