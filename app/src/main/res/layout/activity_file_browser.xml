@@ -63,7 +63,7 @@
         <ImageView
             android:layout_width="80dp"
             android:layout_height="80dp"
-            android:src="@android:drawable/ic_menu_gallery"
+            android:src="@drawable/ic_folder_open"
             android:contentDescription="@string/empty_folder"
             app:tint="?attr/colorOnSurface"
             android:alpha="0.5"
@@ -150,7 +150,7 @@
             app:iconSize="24dp"
             app:iconPadding="12dp"
             android:textAppearance="?attr/textAppearanceTitleMedium"
-            app:icon="@android:drawable/ic_menu_agenda"
+            app:icon="@drawable/ic_create_new_folder"
             android:text="@string/create_folder" />
 
         <com.google.android.material.button.MaterialButton
@@ -165,7 +165,7 @@
             app:iconSize="24dp"
             app:iconPadding="12dp"
             android:textAppearance="?attr/textAppearanceTitleMedium"
-            app:icon="@drawable/ic_sync_upload"
+            app:icon="@drawable/ic_upload_folder"
             android:text="@string/zip_download_folder" />
 
         <com.google.android.material.button.MaterialButton
@@ -179,7 +179,7 @@
             app:iconSize="24dp"
             app:iconPadding="12dp"
             android:textAppearance="?attr/textAppearanceTitleMedium"
-            app:icon="@android:drawable/ic_menu_upload"
+            app:icon="@drawable/ic_upload_file"
             android:text="@string/upload_files" />
 
     </LinearLayout>
@@ -206,7 +206,7 @@
             android:layout_height="28dp"
             android:layout_gravity="center"
             android:importantForAccessibility="no"
-            android:src="@android:drawable/ic_input_add"
+            android:src="@drawable/ic_add"
             app:tint="?attr/colorOnPrimaryContainer" />
 
         <ImageView
@@ -216,7 +216,7 @@
             android:layout_gravity="center"
             android:alpha="0"
             android:importantForAccessibility="no"
-            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:src="@drawable/ic_close"
             app:tint="?attr/colorOnPrimary" />
 
     </com.google.android.material.card.MaterialCardView>
@@ -269,7 +269,7 @@
         android:text="@string/select_this_folder"
         android:contentDescription="@string/select_this_folder"
         android:visibility="gone"
-        app:icon="@android:drawable/ic_menu_agenda" />
+        app:icon="@drawable/ic_folder" />
 
     <!-- Search FAB - in TopBar integriert über Toolbar Menu -->
     <!-- Sort FAB - in TopBar integriert über Toolbar Menu -->

@@ -141,7 +141,7 @@ public class DialogController {
     name.setText(file.getName());
     icon.setImageResource(
         file.isDirectory()
-            ? android.R.drawable.ic_menu_more
+            ? R.drawable.ic_folder
             : de.schliweb.sambalite.ui.FileAdapter.getFileIcon(file.getName()));
 
     boolean canSync = file.isDirectory() && folderSyncCallback != null;
@@ -263,7 +263,7 @@ public class DialogController {
 
     icon.setImageResource(
         file.isDirectory()
-            ? android.R.drawable.ic_menu_more
+            ? R.drawable.ic_folder
             : de.schliweb.sambalite.ui.FileAdapter.getFileIcon(file.getName()));
     name.setText(file.getName());
     typeValue.setText(describeFileType(context, file));
