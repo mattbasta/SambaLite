@@ -111,7 +111,9 @@ public class FileBrowserActivity extends AppCompatActivity
   private SwipeRefreshLayout swipeRefreshLayout;
   private View emptyView;
   private View loadingView;
-  FloatingActionButton fab;
+  com.google.android.material.card.MaterialCardView fab;
+  private android.widget.ImageView fabIconPlus;
+  private android.widget.ImageView fabIconClose;
   private View fabMenuScrim;
   private View fabMenu;
   private boolean fabMenuOpen = false;
@@ -423,6 +425,8 @@ public class FileBrowserActivity extends AppCompatActivity
     emptyView = findViewById(R.id.empty_state);
     loadingView = findViewById(R.id.loading_state);
     fab = findViewById(R.id.fab);
+    fabIconPlus = findViewById(R.id.fab_icon_plus);
+    fabIconClose = findViewById(R.id.fab_icon_close);
     fabMenuScrim = findViewById(R.id.fab_menu_scrim);
     fabMenu = findViewById(R.id.fab_menu);
     fabMultiOptions = findViewById(R.id.fab_multi_options);
@@ -553,7 +557,7 @@ public class FileBrowserActivity extends AppCompatActivity
                 closeFabMenu();
               } else {
                 // Ensure the action FAB is visible
-                if (!fab.isShown()) fab.show();
+                showMainFab();
               }
             });
 
@@ -844,7 +848,7 @@ public class FileBrowserActivity extends AppCompatActivity
             if (fabClearSelection.getVisibility() != View.VISIBLE) fabClearSelection.show();
           } else {
             // Restore default visibility of the regular FAB
-            fab.setVisibility(View.VISIBLE);
+            showMainFab();
             if (fabMultiOptions.isShown()) fabMultiOptions.hide();
             if (fabSelectAll.isShown()) fabSelectAll.hide();
             if (fabClearSelection.isShown()) fabClearSelection.hide();
@@ -921,7 +925,7 @@ public class FileBrowserActivity extends AppCompatActivity
     fabMenu.setTranslationY(slide);
     fabMenu.setVisibility(View.VISIBLE);
     fabMenu.animate().alpha(1f).translationY(0f).setDuration(150).start();
-    fab.animate().rotation(45f).setDuration(150).start();
+    animateFabMorph(true);
   }
 
   /** Closes the expanding FAB action menu if it is open. */
@@ -942,7 +946,64 @@ public class FileBrowserActivity extends AppCompatActivity
         .setDuration(120)
         .withEndAction(() -> fabMenu.setVisibility(View.GONE))
         .start();
-    fab.animate().rotation(0f).setDuration(120).start();
+    animateFabMorph(false);
+  }
+
+  /**
+   * Morphs the main FAB between its resting shape (large rounded square, plus icon) and its
+   * menu-open shape (smaller circle, close icon), cross-fading the icons.
+   */
+  private void animateFabMorph(boolean open) {
+    int fromSize = dpToPx(open ? 72 : 56);
+    int toSize = dpToPx(open ? 56 : 72);
+    float fromRadius = dpToPx(open ? 24 : 28);
+    float toRadius = dpToPx(open ? 28 : 24);
+    int containerColor =
+        com.google.android.material.color.MaterialColors.getColor(
+            fab, com.google.android.material.R.attr.colorPrimaryContainer);
+    int openColor =
+        com.google.android.material.color.MaterialColors.getColor(
+            fab, androidx.appcompat.R.attr.colorPrimary);
+    int fromColor = open ? containerColor : openColor;
+    int toColor = open ? openColor : containerColor;
+
+    android.animation.ValueAnimator animator = android.animation.ValueAnimator.ofFloat(0f, 1f);
+    animator.setDuration(180);
+    animator.addUpdateListener(
+        anim -> {
+          float f = (float) anim.getAnimatedValue();
+          android.view.ViewGroup.LayoutParams lp = fab.getLayoutParams();
+          lp.width = (int) (fromSize + (toSize - fromSize) * f);
+          lp.height = lp.width;
+          fab.setLayoutParams(lp);
+          fab.setRadius(fromRadius + (toRadius - fromRadius) * f);
+          fab.setCardBackgroundColor(
+              androidx.core.graphics.ColorUtils.blendARGB(fromColor, toColor, f));
+        });
+    animator.start();
+    fabIconPlus.animate().alpha(open ? 0f : 1f).setDuration(180).start();
+    fabIconClose.animate().alpha(open ? 1f : 0f).setDuration(180).start();
+  }
+
+  /** Shows the main FAB, restoring any hide animation state. */
+  private void showMainFab() {
+    fab.setVisibility(View.VISIBLE);
+    fab.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(120).start();
+  }
+
+  /** Hides the main FAB (and the menu, if open) with a small scale-out. */
+  private void hideMainFab() {
+    if (fab.getVisibility() != View.VISIBLE) {
+      return;
+    }
+    closeFabMenu();
+    fab.animate()
+        .scaleX(0.6f)
+        .scaleY(0.6f)
+        .alpha(0f)
+        .setDuration(120)
+        .withEndAction(() -> fab.setVisibility(View.GONE))
+        .start();
   }
 
   /** Sets up UI event listeners. */
@@ -989,11 +1050,11 @@ public class FileBrowserActivity extends AppCompatActivity
             }
             if (dy > 0) {
               // Scrolling down -> hide
-              if (fab.isShown()) fab.hide();
+              hideMainFab();
               closeFabMenu();
             } else if (dy < 0) {
               // Scrolling up -> show
-              if (!fab.isShown()) fab.show();
+              showMainFab();
             }
           }
 
@@ -1014,7 +1075,7 @@ public class FileBrowserActivity extends AppCompatActivity
               // If at top or idle, ensure the FAB is visible
               boolean canScrollUp = recyclerView.canScrollVertically(-1);
               if (!canScrollUp) {
-                if (!fab.isShown()) fab.show();
+                showMainFab();
               }
             }
           }
