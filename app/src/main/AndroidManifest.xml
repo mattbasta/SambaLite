@@ -68,6 +68,11 @@
             android:exported="false"
             android:theme="@style/Theme.SambaLite"
             android:parentActivityName=".ui.MainActivity" />
+        <activity
+            android:name=".ui.SettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SambaLite.NoActionBar"
+            android:parentActivityName=".ui.MainActivity" />
 
         <!-- FileProvider for sharing cached files with external apps -->
         <provider

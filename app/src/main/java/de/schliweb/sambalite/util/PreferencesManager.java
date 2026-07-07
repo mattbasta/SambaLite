@@ -27,6 +27,11 @@ public class PreferencesManager {
   private static final String KEY_AUTH_REQUIRED_FOR_PASSWORD_REVEAL =
       "auth_required_for_password_reveal";
   private static final String KEY_SHOW_THUMBNAILS = "show_thumbnails";
+  private static final String KEY_THUMBNAIL_MAX_SIZE_MB = "thumbnail_max_size_mb";
+  private static final String KEY_THUMBNAIL_LAZY_LOAD_ON_TAP = "thumbnail_lazy_load_on_tap";
+
+  /** Default maximum file size (in MB) for which thumbnails are generated. */
+  public static final int DEFAULT_THUMBNAIL_MAX_SIZE_MB = 5;
 
   private final SharedPreferences preferences;
 
@@ -171,5 +176,44 @@ public class PreferencesManager {
     boolean showThumbnails = preferences.getBoolean(KEY_SHOW_THUMBNAILS, false);
     LogUtils.d("PreferencesManager", "Retrieved show thumbnails: " + showThumbnails);
     return showThumbnails;
+  }
+
+  /**
+   * Saves the maximum file size for thumbnail generation.
+   *
+   * @param maxSizeMb The maximum size in megabytes; 0 means no limit
+   */
+  public void saveThumbnailMaxSizeMb(int maxSizeMb) {
+    LogUtils.d("PreferencesManager", "Saving thumbnail max size: " + maxSizeMb + " MB");
+    preferences.edit().putInt(KEY_THUMBNAIL_MAX_SIZE_MB, maxSizeMb).apply();
+  }
+
+  /**
+   * Gets the maximum file size for thumbnail generation.
+   *
+   * @return The maximum size in megabytes (default {@link #DEFAULT_THUMBNAIL_MAX_SIZE_MB}); 0 means
+   *     no limit
+   */
+  public int getThumbnailMaxSizeMb() {
+    return preferences.getInt(KEY_THUMBNAIL_MAX_SIZE_MB, DEFAULT_THUMBNAIL_MAX_SIZE_MB);
+  }
+
+  /**
+   * Saves whether thumbnails should only be loaded when the user taps their placeholder.
+   *
+   * @param lazyLoadOnTap Whether to load thumbnails on tap only
+   */
+  public void saveThumbnailLazyLoadOnTap(boolean lazyLoadOnTap) {
+    LogUtils.d("PreferencesManager", "Saving thumbnail lazy load on tap: " + lazyLoadOnTap);
+    preferences.edit().putBoolean(KEY_THUMBNAIL_LAZY_LOAD_ON_TAP, lazyLoadOnTap).apply();
+  }
+
+  /**
+   * Gets whether thumbnails should only be loaded when the user taps their placeholder.
+   *
+   * @return true if thumbnails load on tap only, false by default
+   */
+  public boolean isThumbnailLazyLoadOnTap() {
+    return preferences.getBoolean(KEY_THUMBNAIL_LAZY_LOAD_ON_TAP, false);
   }
 }
