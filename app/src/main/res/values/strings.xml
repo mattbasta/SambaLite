@@ -87,6 +87,17 @@
     <string name="file_exists_message">The file &#8220;%1$s&#8221; already exists. Do you want to overwrite it?</string>
     <string name="overwrite">Overwrite</string>
 
+    <!-- Settings -->
+    <string name="settings">Settings</string>
+    <string name="thumbnails_section">Thumbnails</string>
+    <string name="show_thumbnails_summary">Generating a thumbnail downloads the file, so thumbnails can use a lot of data.</string>
+    <string name="thumbnail_lazy_tap">Load thumbnails on tap only</string>
+    <string name="thumbnail_lazy_tap_summary">Show a placeholder until you tap it. Applied automatically on metered connections and battery saver.</string>
+    <string name="thumbnail_size_limit">Thumbnail size limit</string>
+    <string name="thumbnail_size_limit_summary">Files larger than this never get thumbnails.</string>
+    <string name="thumbnail_size_mb">%1$d MB</string>
+    <string name="thumbnail_size_no_limit">No limit</string>
+
     <!-- File actions sheet / information -->
     <string name="view_information">View information</string>
     <string name="info_type">Type</string>

@@ -1541,9 +1541,9 @@ public class MainActivity extends AppCompatActivity
       startActivity(TransferQueueActivity.createIntent(this));
       return true;
     }
-    if (item.getItemId() == R.id.action_security_settings) {
-      LogUtils.d("MainActivity", "Security settings menu item selected");
-      authenticateBeforeSecuritySettings();
+    if (item.getItemId() == R.id.action_settings) {
+      LogUtils.d("MainActivity", "Settings menu item selected");
+      startActivity(SettingsActivity.createIntent(this));
       return true;
     }
     if (item.getItemId() == R.id.action_system_monitor) {
@@ -1580,87 +1580,6 @@ public class MainActivity extends AppCompatActivity
       backgroundSmbManager.requestStopService();
     }
     finishAffinity();
-  }
-
-  /**
-   * Requires authentication before opening the security settings dialog if any auth setting is
-   * currently enabled. This prevents unauthorized users from disabling security protections.
-   */
-  private void authenticateBeforeSecuritySettings() {
-    boolean anyAuthEnabled =
-        preferencesManager.isAuthRequiredForAccess()
-            || preferencesManager.isAuthRequiredForPasswordReveal();
-
-    if (anyAuthEnabled && BiometricAuthHelper.isDeviceAuthAvailable(this)) {
-      BiometricAuthHelper.authenticate(
-          this,
-          getString(R.string.auth_title_access),
-          getString(R.string.auth_subtitle_security_settings),
-          new BiometricAuthHelper.AuthCallback() {
-            @Override
-            public void onAuthSuccess() {
-              showSecuritySettingsDialog();
-            }
-
-            @Override
-            public void onAuthFailure(String errorMessage) {
-              EnhancedUIUtils.showError(
-                  MainActivity.this, getString(R.string.auth_failed, errorMessage));
-            }
-
-            @Override
-            public void onAuthCancelled() {
-              LogUtils.d("MainActivity", "Security settings authentication cancelled by user");
-            }
-          });
-    } else {
-      showSecuritySettingsDialog();
-    }
-  }
-
-  /** Shows a dialog for configuring security settings. */
-  private void showSecuritySettingsDialog() {
-    LogUtils.d("MainActivity", "Showing security settings dialog");
-
-    boolean deviceAuthAvailable = BiometricAuthHelper.isDeviceAuthAvailable(this);
-
-    View dialogView = getLayoutInflater().inflate(R.layout.dialog_security_settings, null);
-    com.google.android.material.materialswitch.MaterialSwitch authAccessSwitch =
-        dialogView.findViewById(R.id.auth_access_switch);
-    com.google.android.material.materialswitch.MaterialSwitch authPasswordSwitch =
-        dialogView.findViewById(R.id.auth_password_reveal_switch);
-    TextView authNotAvailableText = dialogView.findViewById(R.id.auth_not_available_text);
-
-    // Set current values
-    authAccessSwitch.setChecked(preferencesManager.isAuthRequiredForAccess());
-    authPasswordSwitch.setChecked(preferencesManager.isAuthRequiredForPasswordReveal());
-
-    // Disable switches if device auth is not available
-    if (!deviceAuthAvailable) {
-      authAccessSwitch.setEnabled(false);
-      authPasswordSwitch.setEnabled(false);
-      authNotAvailableText.setVisibility(View.VISIBLE);
-    } else {
-      authNotAvailableText.setVisibility(View.GONE);
-    }
-
-    new MaterialAlertDialogBuilder(this)
-        .setTitle(R.string.security_settings_title)
-        .setView(dialogView)
-        .setPositiveButton(
-            R.string.save,
-            (dialog, which) -> {
-              preferencesManager.saveAuthRequiredForAccess(authAccessSwitch.isChecked());
-              preferencesManager.saveAuthRequiredForPasswordReveal(authPasswordSwitch.isChecked());
-              LogUtils.i(
-                  "MainActivity",
-                  "Security settings saved: access="
-                      + authAccessSwitch.isChecked()
-                      + ", passwordReveal="
-                      + authPasswordSwitch.isChecked());
-            })
-        .setNegativeButton(R.string.cancel, null)
-        .show();
   }
 
   /** Shows the network scan dialog to discover SMB servers. */

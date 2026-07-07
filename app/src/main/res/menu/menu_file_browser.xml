@@ -28,9 +28,9 @@
         android:orderInCategory="8" />
 
     <item
-        android:id="@+id/action_security_settings"
-        android:title="@string/security_settings_title"
-        android:icon="@drawable/ic_lock"
+        android:id="@+id/action_settings"
+        android:title="@string/settings"
+        android:icon="@drawable/ic_settings"
         app:showAsAction="never"
         android:orderInCategory="9" />
 

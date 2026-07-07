@@ -16,7 +16,6 @@ import android.content.IntentFilter;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.*;
-import android.widget.TextView;
 import androidx.activity.EdgeToEdge;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -33,7 +32,6 @@ import de.schliweb.sambalite.data.model.SmbConnection;
 import de.schliweb.sambalite.data.model.SmbFileItem;
 import de.schliweb.sambalite.data.repository.SmbRepository;
 import de.schliweb.sambalite.di.AppComponent;
-import de.schliweb.sambalite.security.BiometricAuthHelper;
 import de.schliweb.sambalite.sync.SyncConfig;
 import de.schliweb.sambalite.sync.SyncDirection;
 import de.schliweb.sambalite.sync.SyncManager;
@@ -1501,6 +1499,9 @@ public class FileBrowserActivity extends AppCompatActivity
       PreferenceUtils.setNeedsRefresh(this, false);
       fileListViewModel.refreshCurrentDirectory();
     }
+
+    // Pick up preference changes made in the settings screen
+    fileListViewModel.setShowThumbnails(preferencesManager.getShowThumbnails());
   }
 
   @Override
@@ -1653,9 +1654,9 @@ public class FileBrowserActivity extends AppCompatActivity
     } else if (item.getItemId() == R.id.action_transfer_queue) {
       startActivity(TransferQueueActivity.createIntent(this));
       return true;
-    } else if (item.getItemId() == R.id.action_security_settings) {
-      LogUtils.d("FileBrowserActivity", "Security settings menu item selected");
-      authenticateBeforeSecuritySettings();
+    } else if (item.getItemId() == R.id.action_settings) {
+      LogUtils.d("FileBrowserActivity", "Settings menu item selected");
+      startActivity(SettingsActivity.createIntent(this));
       return true;
     } else if (item.getItemId() == R.id.action_system_monitor) {
       LogUtils.d("FileBrowserActivity", "System Monitor menu item selected");
@@ -1667,85 +1668,6 @@ public class FileBrowserActivity extends AppCompatActivity
       return true;
     }
     return super.onOptionsItemSelected(item);
-  }
-
-  /**
-   * Requires authentication before opening the security settings dialog if any auth setting is
-   * currently enabled. This prevents unauthorized users from disabling security protections.
-   */
-  private void authenticateBeforeSecuritySettings() {
-    boolean anyAuthEnabled =
-        preferencesManager.isAuthRequiredForAccess()
-            || preferencesManager.isAuthRequiredForPasswordReveal();
-
-    if (anyAuthEnabled && BiometricAuthHelper.isDeviceAuthAvailable(this)) {
-      BiometricAuthHelper.authenticate(
-          this,
-          getString(R.string.auth_title_access),
-          getString(R.string.auth_subtitle_security_settings),
-          new BiometricAuthHelper.AuthCallback() {
-            @Override
-            public void onAuthSuccess() {
-              showSecuritySettingsDialog();
-            }
-
-            @Override
-            public void onAuthFailure(String errorMessage) {
-              progressController.showError(getString(R.string.auth_failed, errorMessage), null);
-            }
-
-            @Override
-            public void onAuthCancelled() {
-              LogUtils.d(
-                  "FileBrowserActivity", "Security settings authentication cancelled by user");
-            }
-          });
-    } else {
-      showSecuritySettingsDialog();
-    }
-  }
-
-  /** Shows a dialog for configuring security settings. */
-  private void showSecuritySettingsDialog() {
-    LogUtils.d("FileBrowserActivity", "Showing security settings dialog");
-
-    boolean deviceAuthAvailable = BiometricAuthHelper.isDeviceAuthAvailable(this);
-
-    View dialogView = getLayoutInflater().inflate(R.layout.dialog_security_settings, null);
-    com.google.android.material.materialswitch.MaterialSwitch authAccessSwitch =
-        dialogView.findViewById(R.id.auth_access_switch);
-    com.google.android.material.materialswitch.MaterialSwitch authPasswordSwitch =
-        dialogView.findViewById(R.id.auth_password_reveal_switch);
-    TextView authNotAvailableText = dialogView.findViewById(R.id.auth_not_available_text);
-
-    authAccessSwitch.setChecked(preferencesManager.isAuthRequiredForAccess());
-    authPasswordSwitch.setChecked(preferencesManager.isAuthRequiredForPasswordReveal());
-
-    if (!deviceAuthAvailable) {
-      authAccessSwitch.setEnabled(false);
-      authPasswordSwitch.setEnabled(false);
-      authNotAvailableText.setVisibility(View.VISIBLE);
-    } else {
-      authNotAvailableText.setVisibility(View.GONE);
-    }
-
-    new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
-        .setTitle(R.string.security_settings_title)
-        .setView(dialogView)
-        .setPositiveButton(
-            R.string.save,
-            (dialog, which) -> {
-              preferencesManager.saveAuthRequiredForAccess(authAccessSwitch.isChecked());
-              preferencesManager.saveAuthRequiredForPasswordReveal(authPasswordSwitch.isChecked());
-              LogUtils.i(
-                  "FileBrowserActivity",
-                  "Security settings saved: access="
-                      + authAccessSwitch.isChecked()
-                      + ", passwordReveal="
-                      + authPasswordSwitch.isChecked());
-            })
-        .setNegativeButton(R.string.cancel, null)
-        .show();
   }
 
   /** Builds the full remote path for a folder item in the current directory. */

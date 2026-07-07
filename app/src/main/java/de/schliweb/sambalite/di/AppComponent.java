@@ -16,6 +16,7 @@ import dagger.Component;
 import de.schliweb.sambalite.SambaLiteApp;
 import de.schliweb.sambalite.ui.FileBrowserActivity;
 import de.schliweb.sambalite.ui.MainActivity;
+import de.schliweb.sambalite.ui.SettingsActivity;
 import de.schliweb.sambalite.ui.ShareReceiverActivity;
 import de.schliweb.sambalite.ui.SystemMonitorActivity;
 import javax.inject.Singleton;
@@ -42,6 +43,9 @@ public interface AppComponent {
 
   /** Injects dependencies into the SystemMonitorActivity. */
   void inject(@NonNull SystemMonitorActivity activity);
+
+  /** Injects dependencies into the SettingsActivity. */
+  void inject(@NonNull SettingsActivity activity);
 
   /** Builder for the AppComponent. */
   @Component.Builder
