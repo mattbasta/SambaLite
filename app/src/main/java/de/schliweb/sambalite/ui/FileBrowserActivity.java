@@ -2103,11 +2103,19 @@ public class FileBrowserActivity extends AppCompatActivity
     }
 
     java.util.ArrayList<SmbFileItem> pages = new java.util.ArrayList<>();
-    if (FileViewerActivity.isImage(file.getName())) {
+    boolean galleryOfImages = FileViewerActivity.isImage(file.getName());
+    boolean galleryOfAudio = FileViewerActivity.isAudio(file.getName());
+    if (galleryOfImages || galleryOfAudio) {
+      // Swipe between all files of the same kind in the current list
       for (SmbFileItem candidate : fileListController.getCurrentFiles()) {
-        if (candidate != null
-            && candidate.isFile()
-            && FileViewerActivity.isImage(candidate.getName())) {
+        if (candidate == null || !candidate.isFile()) {
+          continue;
+        }
+        boolean sameKind =
+            galleryOfImages
+                ? FileViewerActivity.isImage(candidate.getName())
+                : FileViewerActivity.isAudio(candidate.getName());
+        if (sameKind) {
           pages.add(candidate);
         }
       }
