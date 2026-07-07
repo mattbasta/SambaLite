@@ -107,6 +107,9 @@
     <string name="viewer_error_loading">Couldn\'t load %1$s</string>
     <string name="viewer_text_truncated">\n\n— Preview truncated (file larger than 1 MB) —</string>
     <string name="viewer_image_description">Image preview</string>
+    <string name="audio_play">Play</string>
+    <string name="audio_pause">Pause</string>
+    <string name="audio_time_zero">0:00</string>
 
     <!-- File actions sheet / information -->
     <string name="view_information">View information</string>

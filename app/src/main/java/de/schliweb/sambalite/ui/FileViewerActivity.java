@@ -17,6 +17,7 @@ import android.graphics.ImageDecoder;
 import android.graphics.drawable.AnimatedImageDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.pdf.PdfRenderer;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
@@ -36,6 +37,7 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager2.widget.ViewPager2;
+import com.google.android.material.slider.Slider;
 import com.google.android.material.snackbar.Snackbar;
 import de.schliweb.sambalite.R;
 import de.schliweb.sambalite.SambaLiteApp;
@@ -81,15 +83,18 @@ public class FileViewerActivity extends AppCompatActivity {
   private static final Set<String> TEXT_EXTENSIONS =
       new HashSet<>(
           Arrays.asList("txt", "md", "log", "json", "xml", "csv", "ini", "conf", "yaml", "yml"));
+  private static final Set<String> AUDIO_EXTENSIONS =
+      new HashSet<>(Arrays.asList("mp3", "wav", "flac", "ogg", "m4a"));
 
   private static final int PAGE_TYPE_IMAGE = 0;
   private static final int PAGE_TYPE_TEXT = 1;
   private static final int PAGE_TYPE_PDF = 2;
+  private static final int PAGE_TYPE_AUDIO = 3;
 
   @Inject SmbRepository smbRepository;
 
   private final ExecutorService executor = Executors.newFixedThreadPool(2);
-  private final Set<PageHolder> pdfPageHolders = new HashSet<>();
+  private final Set<PageHolder> pageHolders = new HashSet<>();
   private ArrayList<SmbFileItem> files;
   private SmbConnection connection;
   private ViewPager2 pager;
@@ -111,7 +116,15 @@ public class FileViewerActivity extends AppCompatActivity {
   /** Returns true if the file can be shown by this viewer. */
   public static boolean isViewable(@NonNull SmbFileItem file) {
     return file.isFile()
-        && (isImage(file.getName()) || isText(file.getName()) || isPdf(file.getName()));
+        && (isImage(file.getName())
+            || isText(file.getName())
+            || isPdf(file.getName())
+            || isAudio(file.getName()));
+  }
+
+  /** Returns true if the filename has a supported audio extension. */
+  public static boolean isAudio(@Nullable String filename) {
+    return AUDIO_EXTENSIONS.contains(extensionOf(filename));
   }
 
   /** Returns true if the filename is a PDF. */
@@ -164,6 +177,7 @@ public class FileViewerActivity extends AppCompatActivity {
           @Override
           public void onPageSelected(int position) {
             updateToolbar(position);
+            pauseAllAudio();
           }
         });
     updateToolbar(pager.getCurrentItem());
@@ -175,13 +189,25 @@ public class FileViewerActivity extends AppCompatActivity {
   }
 
   @Override
+  protected void onPause() {
+    super.onPause();
+    pauseAllAudio();
+  }
+
+  @Override
   protected void onDestroy() {
     super.onDestroy();
-    for (PageHolder holder : pdfPageHolders) {
-      holder.releasePdf();
+    for (PageHolder holder : pageHolders) {
+      holder.releaseResources();
     }
-    pdfPageHolders.clear();
+    pageHolders.clear();
     executor.shutdown();
+  }
+
+  private void pauseAllAudio() {
+    for (PageHolder holder : pageHolders) {
+      holder.pauseAudio();
+    }
   }
 
   @Override
@@ -314,6 +340,11 @@ public class FileViewerActivity extends AppCompatActivity {
         });
   }
 
+  private static String formatMillis(int millis) {
+    int totalSeconds = millis / 1000;
+    return String.format(Locale.getDefault(), "%d:%02d", totalSeconds / 60, totalSeconds % 60);
+  }
+
   private static void closeQuietly(
       @Nullable PdfRenderer renderer, @Nullable ParcelFileDescriptor fd) {
     if (renderer != null) {
@@ -413,6 +444,7 @@ public class FileViewerActivity extends AppCompatActivity {
       String name = files.get(position).getName();
       if (isImage(name)) return PAGE_TYPE_IMAGE;
       if (isPdf(name)) return PAGE_TYPE_PDF;
+      if (isAudio(name)) return PAGE_TYPE_AUDIO;
       return PAGE_TYPE_TEXT;
     }
 
@@ -424,6 +456,8 @@ public class FileViewerActivity extends AppCompatActivity {
         layout = R.layout.item_viewer_image;
       } else if (viewType == PAGE_TYPE_PDF) {
         layout = R.layout.item_viewer_pdf;
+      } else if (viewType == PAGE_TYPE_AUDIO) {
+        layout = R.layout.item_viewer_audio;
       } else {
         layout = R.layout.item_viewer_text;
       }
@@ -438,7 +472,7 @@ public class FileViewerActivity extends AppCompatActivity {
 
     @Override
     public void onViewRecycled(@NonNull PageHolder holder) {
-      holder.releasePdf();
+      holder.releaseResources();
     }
 
     @Override
@@ -452,31 +486,34 @@ public class FileViewerActivity extends AppCompatActivity {
     private final @Nullable ImageView imageView;
     private final @Nullable TextView textView;
     private final @Nullable RecyclerView pdfPages;
+    private final @Nullable View audioControls;
     private final View progress;
     private final TextView errorView;
     private String boundPath;
     private @Nullable PdfRenderer pdfRenderer;
     private @Nullable ParcelFileDescriptor pdfFd;
+    private @Nullable MediaPlayer mediaPlayer;
+    private @Nullable Runnable audioTicker;
 
     PageHolder(@NonNull View itemView) {
       super(itemView);
       imageView = itemView.findViewById(R.id.viewer_image);
       textView = itemView.findViewById(R.id.viewer_text);
       pdfPages = itemView.findViewById(R.id.viewer_pdf_pages);
+      audioControls = itemView.findViewById(R.id.viewer_audio_controls);
       progress = itemView.findViewById(R.id.viewer_progress);
       errorView = itemView.findViewById(R.id.viewer_error);
-      if (pdfPages != null) {
-        pdfPageHolders.add(this);
-      }
+      pageHolders.add(this);
     }
 
     void bind(SmbFileItem item) {
       boundPath = item.getPath();
-      releasePdf();
+      releaseResources();
       progress.setVisibility(View.VISIBLE);
       errorView.setVisibility(View.GONE);
       if (imageView != null) imageView.setImageDrawable(null);
       if (textView != null) textView.setText("");
+      if (audioControls != null) audioControls.setVisibility(View.GONE);
 
       fetchToCache(
           item,
@@ -484,6 +521,8 @@ public class FileViewerActivity extends AppCompatActivity {
             if (!item.getPath().equals(boundPath)) return; // recycled onto another file
             if (pdfPages != null) {
               loadPdf(item, localFile);
+            } else if (audioControls != null) {
+              loadAudio(item, localFile);
             } else if (imageView != null) {
               loadImage(item, localFile);
             } else {
@@ -496,6 +535,139 @@ public class FileViewerActivity extends AppCompatActivity {
             errorView.setText(getString(R.string.viewer_error_loading, item.getName()));
             errorView.setVisibility(View.VISIBLE);
           });
+    }
+
+    private void loadAudio(SmbFileItem item, File localFile) {
+      com.google.android.material.button.MaterialButton playButton =
+          itemView.findViewById(R.id.viewer_audio_play);
+      Slider seek = itemView.findViewById(R.id.viewer_audio_seek);
+      TextView elapsed = itemView.findViewById(R.id.viewer_audio_elapsed);
+      TextView duration = itemView.findViewById(R.id.viewer_audio_duration);
+
+      MediaPlayer player = new MediaPlayer();
+      mediaPlayer = player;
+      try {
+        player.setDataSource(localFile.getAbsolutePath());
+      } catch (Exception e) {
+        LogUtils.e("FileViewerActivity", "Audio open failed: " + e.getMessage());
+        player.release();
+        mediaPlayer = null;
+        progress.setVisibility(View.GONE);
+        errorView.setText(getString(R.string.viewer_error_loading, item.getName()));
+        errorView.setVisibility(View.VISIBLE);
+        return;
+      }
+
+      player.setOnPreparedListener(
+          mp -> {
+            if (!item.getPath().equals(boundPath) || mediaPlayer != mp) return;
+            progress.setVisibility(View.GONE);
+            audioControls.setVisibility(View.VISIBLE);
+            int durationMs = Math.max(1, mp.getDuration());
+            seek.setValueTo(durationMs);
+            seek.setValue(0);
+            duration.setText(formatMillis(durationMs));
+            elapsed.setText(formatMillis(0));
+          });
+      player.setOnCompletionListener(
+          mp -> {
+            playButton.setIconResource(R.drawable.ic_play);
+            playButton.setContentDescription(getString(R.string.audio_play));
+          });
+      player.setOnErrorListener(
+          (mp, what, extra) -> {
+            LogUtils.w("FileViewerActivity", "Audio playback error: " + what + "/" + extra);
+            return false;
+          });
+
+      playButton.setOnClickListener(
+          v -> {
+            MediaPlayer current = mediaPlayer;
+            if (current == null) return;
+            if (current.isPlaying()) {
+              current.pause();
+              playButton.setIconResource(R.drawable.ic_play);
+              playButton.setContentDescription(getString(R.string.audio_play));
+            } else {
+              current.start();
+              playButton.setIconResource(R.drawable.ic_pause);
+              playButton.setContentDescription(getString(R.string.audio_pause));
+              startAudioTicker(seek, elapsed);
+            }
+          });
+      seek.addOnChangeListener(
+          (slider, value, fromUser) -> {
+            MediaPlayer current = mediaPlayer;
+            if (fromUser && current != null) {
+              current.seekTo((int) value);
+              elapsed.setText(formatMillis((int) value));
+            }
+          });
+
+      player.prepareAsync();
+    }
+
+    private void startAudioTicker(Slider seek, TextView elapsed) {
+      if (audioTicker != null) {
+        itemView.removeCallbacks(audioTicker);
+      }
+      audioTicker =
+          () -> {
+            MediaPlayer current = mediaPlayer;
+            if (current == null) return;
+            try {
+              if (current.isPlaying()) {
+                int position = Math.min(current.getCurrentPosition(), (int) seek.getValueTo());
+                seek.setValue(position);
+                elapsed.setText(formatMillis(position));
+                itemView.postDelayed(audioTicker, 500);
+              }
+            } catch (IllegalStateException ignored) {
+              // player released mid-tick
+            }
+          };
+      itemView.postDelayed(audioTicker, 500);
+    }
+
+    /** Pauses audio playback if this page is playing. */
+    void pauseAudio() {
+      MediaPlayer current = mediaPlayer;
+      if (current != null) {
+        try {
+          if (current.isPlaying()) {
+            current.pause();
+            com.google.android.material.button.MaterialButton playButton =
+                itemView.findViewById(R.id.viewer_audio_play);
+            if (playButton != null) {
+              playButton.setIconResource(R.drawable.ic_play);
+              playButton.setContentDescription(getString(R.string.audio_play));
+            }
+          }
+        } catch (IllegalStateException ignored) {
+          // player released
+        }
+      }
+    }
+
+    private void releaseAudio() {
+      if (audioTicker != null) {
+        itemView.removeCallbacks(audioTicker);
+        audioTicker = null;
+      }
+      if (mediaPlayer != null) {
+        try {
+          mediaPlayer.release();
+        } catch (Exception ignored) {
+          // already released
+        }
+        mediaPlayer = null;
+      }
+    }
+
+    /** Releases all page-held resources (PDF renderer, audio player). */
+    void releaseResources() {
+      releasePdf();
+      releaseAudio();
     }
 
     private void loadPdf(SmbFileItem item, File localFile) {
