@@ -1,0 +1,449 @@
+/*
+ * Copyright 2025 Christian Kierdorf
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ */
+package de.schliweb.sambalite.ui;
+
+import android.content.Context;
+import android.content.Intent;
+import android.graphics.ImageDecoder;
+import android.graphics.drawable.AnimatedImageDrawable;
+import android.graphics.drawable.Drawable;
+import android.net.Uri;
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.TextView;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.viewpager2.widget.ViewPager2;
+import com.google.android.material.snackbar.Snackbar;
+import de.schliweb.sambalite.R;
+import de.schliweb.sambalite.SambaLiteApp;
+import de.schliweb.sambalite.data.model.SmbConnection;
+import de.schliweb.sambalite.data.model.SmbFileItem;
+import de.schliweb.sambalite.data.repository.SmbRepository;
+import de.schliweb.sambalite.util.EnhancedFileUtils;
+import de.schliweb.sambalite.util.FileOpener;
+import de.schliweb.sambalite.util.LogUtils;
+import de.schliweb.sambalite.util.OpenFileCacheManager;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
+import javax.inject.Inject;
+
+/**
+ * In-app lightbox viewer for common file types. Images support gallery-style swiping between the
+ * viewable files passed in; text files render inline. Files are fetched into the shared open-file
+ * cache (same cache the external "Open" flow uses), so repeated views are free.
+ */
+public class FileViewerActivity extends AppCompatActivity {
+
+  private static final String EXTRA_CONNECTION = "extra_connection";
+  private static final String EXTRA_FILES = "extra_files";
+  private static final String EXTRA_START_INDEX = "extra_start_index";
+
+  /** Cap for inline text rendering; larger files are truncated with a notice. */
+  private static final long MAX_TEXT_BYTES = 1024 * 1024;
+
+  private static final Set<String> IMAGE_EXTENSIONS =
+      new HashSet<>(Arrays.asList("jpg", "jpeg", "png", "gif", "bmp", "webp", "heic"));
+  private static final Set<String> TEXT_EXTENSIONS =
+      new HashSet<>(
+          Arrays.asList("txt", "md", "log", "json", "xml", "csv", "ini", "conf", "yaml", "yml"));
+
+  private static final int PAGE_TYPE_IMAGE = 0;
+  private static final int PAGE_TYPE_TEXT = 1;
+
+  @Inject SmbRepository smbRepository;
+
+  private final ExecutorService executor = Executors.newFixedThreadPool(2);
+  private ArrayList<SmbFileItem> files;
+  private SmbConnection connection;
+  private ViewPager2 pager;
+  private ActivityResultLauncher<String> saveCopyLauncher;
+
+  /** Creates an intent showing {@code files} starting at {@code startIndex}. */
+  public static @NonNull Intent createIntent(
+      @NonNull Context context,
+      @NonNull SmbConnection connection,
+      @NonNull ArrayList<SmbFileItem> files,
+      int startIndex) {
+    Intent intent = new Intent(context, FileViewerActivity.class);
+    intent.putExtra(EXTRA_CONNECTION, connection);
+    intent.putExtra(EXTRA_FILES, files);
+    intent.putExtra(EXTRA_START_INDEX, startIndex);
+    return intent;
+  }
+
+  /** Returns true if the file can be shown by this viewer. */
+  public static boolean isViewable(@NonNull SmbFileItem file) {
+    return file.isFile() && (isImage(file.getName()) || isText(file.getName()));
+  }
+
+  /** Returns true if the filename has a supported image extension. */
+  public static boolean isImage(@Nullable String filename) {
+    return IMAGE_EXTENSIONS.contains(extensionOf(filename));
+  }
+
+  /** Returns true if the filename has a supported text extension. */
+  public static boolean isText(@Nullable String filename) {
+    return TEXT_EXTENSIONS.contains(extensionOf(filename));
+  }
+
+  private static String extensionOf(@Nullable String filename) {
+    if (filename == null) return "";
+    return EnhancedFileUtils.getFileExtension(filename).toLowerCase(Locale.ROOT);
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  protected void onCreate(@Nullable Bundle savedInstanceState) {
+    ((SambaLiteApp) getApplication()).getAppComponent().inject(this);
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.activity_file_viewer);
+
+    connection = (SmbConnection) getIntent().getSerializableExtra(EXTRA_CONNECTION);
+    files = (ArrayList<SmbFileItem>) getIntent().getSerializableExtra(EXTRA_FILES);
+    int startIndex = getIntent().getIntExtra(EXTRA_START_INDEX, 0);
+    if (connection == null || files == null || files.isEmpty()) {
+      LogUtils.w("FileViewerActivity", "Missing connection or files; finishing");
+      finish();
+      return;
+    }
+
+    Toolbar toolbar = findViewById(R.id.toolbar);
+    setSupportActionBar(toolbar);
+    if (getSupportActionBar() != null) {
+      getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+    }
+
+    pager = findViewById(R.id.viewer_pager);
+    pager.setAdapter(new ViewerAdapter());
+    pager.setCurrentItem(Math.min(Math.max(startIndex, 0), files.size() - 1), false);
+    pager.registerOnPageChangeCallback(
+        new ViewPager2.OnPageChangeCallback() {
+          @Override
+          public void onPageSelected(int position) {
+            updateToolbar(position);
+          }
+        });
+    updateToolbar(pager.getCurrentItem());
+
+    saveCopyLauncher =
+        registerForActivityResult(
+            new ActivityResultContracts.CreateDocument("application/octet-stream"),
+            this::saveCopyTo);
+  }
+
+  @Override
+  protected void onDestroy() {
+    super.onDestroy();
+    executor.shutdown();
+  }
+
+  @Override
+  public boolean onCreateOptionsMenu(Menu menu) {
+    getMenuInflater().inflate(R.menu.menu_file_viewer, menu);
+    return true;
+  }
+
+  @Override
+  public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+    if (item.getItemId() == android.R.id.home) {
+      finish();
+      return true;
+    }
+    SmbFileItem current = currentFile();
+    if (item.getItemId() == R.id.action_open_external) {
+      withCachedFile(
+          current,
+          localFile -> {
+            if (!FileOpener.openFile(this, localFile)) {
+              showSnackbar(getString(R.string.no_app_to_open_file));
+            }
+          });
+      return true;
+    } else if (item.getItemId() == R.id.action_share) {
+      withCachedFile(current, localFile -> shareFile(localFile));
+      return true;
+    } else if (item.getItemId() == R.id.action_save_copy) {
+      saveCopyLauncher.launch(current.getName());
+      return true;
+    }
+    return super.onOptionsItemSelected(item);
+  }
+
+  private SmbFileItem currentFile() {
+    return files.get(pager.getCurrentItem());
+  }
+
+  private void updateToolbar(int position) {
+    if (getSupportActionBar() == null) return;
+    getSupportActionBar().setTitle(files.get(position).getName());
+    getSupportActionBar()
+        .setSubtitle(
+            files.size() > 1
+                ? String.format(Locale.getDefault(), "%d / %d", position + 1, files.size())
+                : null);
+  }
+
+  private void shareFile(File localFile) {
+    Uri uri =
+        androidx.core.content.FileProvider.getUriForFile(
+            this, getPackageName() + ".fileprovider", localFile);
+    Intent send = new Intent(Intent.ACTION_SEND);
+    send.setType(de.schliweb.sambalite.util.MimeTypeUtils.getMimeType(localFile.getName()));
+    send.putExtra(Intent.EXTRA_STREAM, uri);
+    send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+    startActivity(Intent.createChooser(send, getString(R.string.share)));
+  }
+
+  private void saveCopyTo(@Nullable Uri target) {
+    if (target == null) return;
+    SmbFileItem current = currentFile();
+    withCachedFile(
+        current,
+        localFile ->
+            executor.execute(
+                () -> {
+                  try (OutputStream out = getContentResolver().openOutputStream(target)) {
+                    Files.copy(localFile.toPath(), out);
+                    runOnUiThread(() -> showSnackbar(getString(R.string.save_copy_success)));
+                  } catch (Exception e) {
+                    LogUtils.e("FileViewerActivity", "Save copy failed: " + e.getMessage());
+                    runOnUiThread(() -> showSnackbar(getString(R.string.save_copy_error)));
+                  }
+                }));
+  }
+
+  private void showSnackbar(String message) {
+    Snackbar.make(pager, message, Snackbar.LENGTH_LONG).show();
+  }
+
+  /** Runs {@code action} with the locally cached copy of {@code item}, fetching it if needed. */
+  private void withCachedFile(SmbFileItem item, Consumer<File> action) {
+    fetchToCache(
+        item,
+        action,
+        error -> showSnackbar(getString(R.string.viewer_error_loading, item.getName())));
+  }
+
+  /**
+   * Fetches the file into the shared open-file cache, reusing a valid cached copy when present.
+   * Callbacks run on the main thread; both are skipped if the activity is finishing.
+   */
+  private void fetchToCache(SmbFileItem item, Consumer<File> onSuccess, Consumer<String> onError) {
+    executor.execute(
+        () -> {
+          File target = new File(OpenFileCacheManager.getCacheDir(this), item.getName());
+          try {
+            boolean cacheValid = false;
+            if (target.exists() && target.length() > 0) {
+              boolean sizeMatches = item.getSize() <= 0 || target.length() == item.getSize();
+              boolean notStale =
+                  item.getLastModified() == null
+                      || target.lastModified() >= item.getLastModified().getTime();
+              cacheValid = sizeMatches && notStale;
+              if (!cacheValid) {
+                target.delete();
+              }
+            }
+            if (!cacheValid) {
+              OpenFileCacheManager.enforceMaxSize(this, target);
+              smbRepository.downloadFile(connection, item.getPath(), target);
+            }
+            postToUi(() -> onSuccess.accept(target));
+          } catch (Exception e) {
+            LogUtils.e(
+                "FileViewerActivity", "Failed to fetch " + item.getName() + ": " + e.getMessage());
+            target.delete();
+            postToUi(() -> onError.accept(e.getMessage()));
+          }
+        });
+  }
+
+  private void postToUi(Runnable action) {
+    runOnUiThread(
+        () -> {
+          if (!isFinishing() && !isDestroyed()) {
+            action.run();
+          }
+        });
+  }
+
+  /** One page per file: an image page or a scrollable text page. */
+  private class ViewerAdapter extends RecyclerView.Adapter<PageHolder> {
+
+    @Override
+    public int getItemViewType(int position) {
+      return isImage(files.get(position).getName()) ? PAGE_TYPE_IMAGE : PAGE_TYPE_TEXT;
+    }
+
+    @NonNull
+    @Override
+    public PageHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+      int layout =
+          viewType == PAGE_TYPE_IMAGE ? R.layout.item_viewer_image : R.layout.item_viewer_text;
+      return new PageHolder(
+          LayoutInflater.from(parent.getContext()).inflate(layout, parent, false));
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull PageHolder holder, int position) {
+      holder.bind(files.get(position));
+    }
+
+    @Override
+    public int getItemCount() {
+      return files.size();
+    }
+  }
+
+  /** Holder for a viewer page; guards against recycled binds via the bound path. */
+  private class PageHolder extends RecyclerView.ViewHolder {
+    private final @Nullable ImageView imageView;
+    private final @Nullable TextView textView;
+    private final View progress;
+    private final TextView errorView;
+    private String boundPath;
+
+    PageHolder(@NonNull View itemView) {
+      super(itemView);
+      imageView = itemView.findViewById(R.id.viewer_image);
+      textView = itemView.findViewById(R.id.viewer_text);
+      progress = itemView.findViewById(R.id.viewer_progress);
+      errorView = itemView.findViewById(R.id.viewer_error);
+    }
+
+    void bind(SmbFileItem item) {
+      boundPath = item.getPath();
+      progress.setVisibility(View.VISIBLE);
+      errorView.setVisibility(View.GONE);
+      if (imageView != null) imageView.setImageDrawable(null);
+      if (textView != null) textView.setText("");
+
+      fetchToCache(
+          item,
+          localFile -> {
+            if (!item.getPath().equals(boundPath)) return; // recycled onto another file
+            if (imageView != null) {
+              loadImage(item, localFile);
+            } else {
+              loadText(item, localFile);
+            }
+          },
+          error -> {
+            if (!item.getPath().equals(boundPath)) return;
+            progress.setVisibility(View.GONE);
+            errorView.setText(getString(R.string.viewer_error_loading, item.getName()));
+            errorView.setVisibility(View.VISIBLE);
+          });
+    }
+
+    private void loadImage(SmbFileItem item, File localFile) {
+      int screenWidth = getResources().getDisplayMetrics().widthPixels;
+      executor.execute(
+          () -> {
+            try {
+              ImageDecoder.Source source = ImageDecoder.createSource(localFile);
+              Drawable drawable =
+                  ImageDecoder.decodeDrawable(
+                      source,
+                      (decoder, info, src) -> {
+                        // Downsample very large images to roughly 2x the screen width
+                        int width = info.getSize().getWidth();
+                        int maxWidth = screenWidth * 2;
+                        if (width > maxWidth && maxWidth > 0) {
+                          decoder.setTargetSampleSize(
+                              Math.max(1, (int) Math.ceil((double) width / maxWidth)));
+                        }
+                      });
+              postToUi(
+                  () -> {
+                    if (!item.getPath().equals(boundPath)) return;
+                    progress.setVisibility(View.GONE);
+                    imageView.setImageDrawable(drawable);
+                    if (drawable instanceof AnimatedImageDrawable animated) {
+                      animated.start();
+                    }
+                  });
+            } catch (Exception e) {
+              LogUtils.e("FileViewerActivity", "Image decode failed: " + e.getMessage());
+              postToUi(
+                  () -> {
+                    if (!item.getPath().equals(boundPath)) return;
+                    progress.setVisibility(View.GONE);
+                    errorView.setText(getString(R.string.viewer_error_loading, item.getName()));
+                    errorView.setVisibility(View.VISIBLE);
+                  });
+            }
+          });
+    }
+
+    private void loadText(SmbFileItem item, File localFile) {
+      executor.execute(
+          () -> {
+            try {
+              StringBuilder builder = new StringBuilder();
+              boolean truncated;
+              try (InputStreamReader reader =
+                  new InputStreamReader(new FileInputStream(localFile), StandardCharsets.UTF_8)) {
+                char[] buffer = new char[8192];
+                long read = 0;
+                int n;
+                while ((n = reader.read(buffer)) != -1 && read < MAX_TEXT_BYTES) {
+                  builder.append(buffer, 0, n);
+                  read += n;
+                }
+                truncated = n != -1;
+              }
+              if (truncated) {
+                builder.append(getString(R.string.viewer_text_truncated));
+              }
+              String text = builder.toString();
+              postToUi(
+                  () -> {
+                    if (!item.getPath().equals(boundPath)) return;
+                    progress.setVisibility(View.GONE);
+                    textView.setText(text);
+                  });
+            } catch (Exception e) {
+              LogUtils.e("FileViewerActivity", "Text read failed: " + e.getMessage());
+              postToUi(
+                  () -> {
+                    if (!item.getPath().equals(boundPath)) return;
+                    progress.setVisibility(View.GONE);
+                    errorView.setText(getString(R.string.viewer_error_loading, item.getName()));
+                    errorView.setVisibility(View.VISIBLE);
+                  });
+            }
+          });
+    }
+  }
+}

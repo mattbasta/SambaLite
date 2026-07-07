@@ -72,6 +72,18 @@
         <item name="colorOnError">@color/on_error_light</item>
     </style>
 
+    <!-- Always-dark lightbox theme for the in-app file viewer -->
+    <style name="Theme.SambaLite.Viewer" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:colorBackground">@android:color/black</item>
+        <item name="colorSurface">@android:color/black</item>
+        <item name="colorOnSurface">@android:color/white</item>
+        <item name="colorControlNormal">@android:color/white</item>
+    </style>
+
     <!-- Theme for ShareReceiverActivity - transparent dialog-like appearance -->
     <style name="Theme.SambaLite.Dialog" parent="Theme.Material3.DayNight">
         <!-- Make the activity appear as transparent overlay -->

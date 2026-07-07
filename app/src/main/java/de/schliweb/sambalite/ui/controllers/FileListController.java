@@ -69,6 +69,8 @@ public class FileListController
 
   @Setter private FolderChangeCallback folderChangeCallback;
 
+  @Setter private FileActivateCallback fileActivateCallback;
+
   /**
    * Creates a new FileListController.
    *
@@ -242,10 +244,18 @@ public class FileListController
     // If it's a directory, navigate to it
     if (file.isDirectory()) {
       viewModel.navigateToDirectory(file);
+    } else if (fileActivateCallback != null) {
+      // Let the activity decide how to open the file (in-app viewer or action sheet)
+      fileActivateCallback.onFileActivated(file);
     } else {
-      // For files, show the file options dialog
+      // Fallback: show the file options sheet
       onFileOptionsClick(file);
     }
+  }
+
+  /** Returns the files currently displayed by the adapter (folder contents or search results). */
+  public @NonNull List<SmbFileItem> getCurrentFiles() {
+    return adapter.getFiles();
   }
 
   /**
@@ -541,5 +551,10 @@ public class FileListController
   /** Callback when the multi-selection changes. */
   public interface SelectionChangedCallback {
     void onSelectionChanged(int count, @NonNull java.util.List<SmbFileItem> selectedItems);
+  }
+
+  /** Callback when a file row is tapped (activated) outside selection mode. */
+  public interface FileActivateCallback {
+    void onFileActivated(@NonNull SmbFileItem file);
   }
 }

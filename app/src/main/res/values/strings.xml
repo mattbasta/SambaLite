@@ -98,6 +98,16 @@
     <string name="thumbnail_size_mb">%1$d MB</string>
     <string name="thumbnail_size_no_limit">No limit</string>
 
+    <!-- File viewer -->
+    <string name="open_with">Open with</string>
+    <string name="share">Share</string>
+    <string name="save_a_copy">Save a copy</string>
+    <string name="save_copy_success">Copy saved</string>
+    <string name="save_copy_error">Couldn\'t save copy</string>
+    <string name="viewer_error_loading">Couldn\'t load %1$s</string>
+    <string name="viewer_text_truncated">\n\n— Preview truncated (file larger than 1 MB) —</string>
+    <string name="viewer_image_description">Image preview</string>
+
     <!-- File actions sheet / information -->
     <string name="view_information">View information</string>
     <string name="info_type">Type</string>
