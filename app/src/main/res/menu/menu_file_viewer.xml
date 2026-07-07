@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_open_external"
+        android:title="@string/open_with"
+        android:icon="@drawable/ic_open_external"
+        app:showAsAction="ifRoom"
+        android:orderInCategory="1" />
+
+    <item
+        android:id="@+id/action_share"
+        android:title="@string/share"
+        android:icon="@drawable/ic_share"
+        app:showAsAction="ifRoom"
+        android:orderInCategory="2" />
+
+    <item
+        android:id="@+id/action_save_copy"
+        android:title="@string/save_a_copy"
+        android:icon="@drawable/ic_download"
+        app:showAsAction="never"
+        android:orderInCategory="3" />
+</menu>

@@ -15,6 +15,7 @@ import dagger.BindsInstance;
 import dagger.Component;
 import de.schliweb.sambalite.SambaLiteApp;
 import de.schliweb.sambalite.ui.FileBrowserActivity;
+import de.schliweb.sambalite.ui.FileViewerActivity;
 import de.schliweb.sambalite.ui.MainActivity;
 import de.schliweb.sambalite.ui.SettingsActivity;
 import de.schliweb.sambalite.ui.ShareReceiverActivity;
@@ -46,6 +47,9 @@ public interface AppComponent {
 
   /** Injects dependencies into the SettingsActivity. */
   void inject(@NonNull SettingsActivity activity);
+
+  /** Injects dependencies into the FileViewerActivity. */
+  void inject(@NonNull FileViewerActivity activity);
 
   /** Builder for the AppComponent. */
   @Component.Builder

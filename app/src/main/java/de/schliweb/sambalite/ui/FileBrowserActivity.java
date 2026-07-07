@@ -712,6 +712,7 @@ public class FileBrowserActivity extends AppCompatActivity
   private void setupControllerCallbacks() {
     // Set up FileListController callbacks
     fileListController.setFileOptionsCallback(this);
+    fileListController.setFileActivateCallback(this::onFileActivated);
     fileListController.setFolderChangeCallback(this::onRemoteFolderChanged);
 
     // Set up DialogController callbacks
@@ -2088,6 +2089,40 @@ public class FileBrowserActivity extends AppCompatActivity
   public void onFileOptionsClick(@NonNull SmbFileItem file) {
     LogUtils.d("FileBrowserActivity", "File options clicked: " + file.getName());
     dialogController.showFileOptionsDialog(file);
+  }
+
+  /**
+   * Handles a file row tap: viewable types open in the in-app viewer (images swipe through all
+   * images in the current list, gallery-style); everything else gets the action sheet.
+   */
+  private void onFileActivated(@NonNull SmbFileItem file) {
+    SmbConnection connection = fileListViewModel.getConnection();
+    if (connection == null || !FileViewerActivity.isViewable(file)) {
+      dialogController.showFileOptionsDialog(file);
+      return;
+    }
+
+    java.util.ArrayList<SmbFileItem> pages = new java.util.ArrayList<>();
+    if (FileViewerActivity.isImage(file.getName())) {
+      for (SmbFileItem candidate : fileListController.getCurrentFiles()) {
+        if (candidate != null
+            && candidate.isFile()
+            && FileViewerActivity.isImage(candidate.getName())) {
+          pages.add(candidate);
+        }
+      }
+    }
+    if (pages.isEmpty()) {
+      pages.add(file);
+    }
+    int startIndex = 0;
+    for (int i = 0; i < pages.size(); i++) {
+      if (pages.get(i).getPath().equals(file.getPath())) {
+        startIndex = i;
+        break;
+      }
+    }
+    startActivity(FileViewerActivity.createIntent(this, connection, pages, startIndex));
   }
 
   @Override
