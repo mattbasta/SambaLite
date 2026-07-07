@@ -11,11 +11,15 @@ package de.schliweb.sambalite.ui;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.graphics.ImageDecoder;
 import android.graphics.drawable.AnimatedImageDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.pdf.PdfRenderer;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.ParcelFileDescriptor;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -29,6 +33,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager2.widget.ViewPager2;
 import com.google.android.material.snackbar.Snackbar;
@@ -79,10 +84,12 @@ public class FileViewerActivity extends AppCompatActivity {
 
   private static final int PAGE_TYPE_IMAGE = 0;
   private static final int PAGE_TYPE_TEXT = 1;
+  private static final int PAGE_TYPE_PDF = 2;
 
   @Inject SmbRepository smbRepository;
 
   private final ExecutorService executor = Executors.newFixedThreadPool(2);
+  private final Set<PageHolder> pdfPageHolders = new HashSet<>();
   private ArrayList<SmbFileItem> files;
   private SmbConnection connection;
   private ViewPager2 pager;
@@ -103,7 +110,13 @@ public class FileViewerActivity extends AppCompatActivity {
 
   /** Returns true if the file can be shown by this viewer. */
   public static boolean isViewable(@NonNull SmbFileItem file) {
-    return file.isFile() && (isImage(file.getName()) || isText(file.getName()));
+    return file.isFile()
+        && (isImage(file.getName()) || isText(file.getName()) || isPdf(file.getName()));
+  }
+
+  /** Returns true if the filename is a PDF. */
+  public static boolean isPdf(@Nullable String filename) {
+    return "pdf".equals(extensionOf(filename));
   }
 
   /** Returns true if the filename has a supported image extension. */
@@ -164,6 +177,10 @@ public class FileViewerActivity extends AppCompatActivity {
   @Override
   protected void onDestroy() {
     super.onDestroy();
+    for (PageHolder holder : pdfPageHolders) {
+      holder.releasePdf();
+    }
+    pdfPageHolders.clear();
     executor.shutdown();
   }
 
@@ -297,19 +314,119 @@ public class FileViewerActivity extends AppCompatActivity {
         });
   }
 
-  /** One page per file: an image page or a scrollable text page. */
+  private static void closeQuietly(
+      @Nullable PdfRenderer renderer, @Nullable ParcelFileDescriptor fd) {
+    if (renderer != null) {
+      try {
+        renderer.close();
+      } catch (Exception ignored) {
+        // already closed
+      }
+    }
+    if (fd != null) {
+      try {
+        fd.close();
+      } catch (Exception ignored) {
+        // already closed
+      }
+    }
+  }
+
+  /** Renders one PDF page per row into a full-width bitmap with a white page background. */
+  private class PdfPagesAdapter extends RecyclerView.Adapter<PdfPagesAdapter.PdfPageHolder> {
+    private final PdfRenderer renderer;
+    private final int pageWidth;
+    private final int pageCount;
+
+    PdfPagesAdapter(PdfRenderer renderer) {
+      this.renderer = renderer;
+      this.pageWidth = getResources().getDisplayMetrics().widthPixels;
+      this.pageCount = renderer.getPageCount();
+    }
+
+    class PdfPageHolder extends RecyclerView.ViewHolder {
+      final ImageView pageView;
+      int boundPage = -1;
+
+      PdfPageHolder(ImageView view) {
+        super(view);
+        pageView = view;
+      }
+    }
+
+    @NonNull
+    @Override
+    public PdfPageHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+      ImageView view = new ImageView(parent.getContext());
+      RecyclerView.LayoutParams params =
+          new RecyclerView.LayoutParams(
+              ViewGroup.LayoutParams.MATCH_PARENT, (int) (pageWidth * 1.3f));
+      params.bottomMargin =
+          (int) (8 * parent.getContext().getResources().getDisplayMetrics().density);
+      view.setLayoutParams(params);
+      view.setAdjustViewBounds(true);
+      return new PdfPageHolder(view);
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull PdfPageHolder holder, int position) {
+      holder.boundPage = position;
+      holder.pageView.setImageDrawable(null);
+      executor.execute(
+          () -> {
+            try {
+              final Bitmap bitmap;
+              synchronized (renderer) {
+                try (PdfRenderer.Page page = renderer.openPage(position)) {
+                  int height = Math.max(1, pageWidth * page.getHeight() / page.getWidth());
+                  bitmap = Bitmap.createBitmap(pageWidth, height, Bitmap.Config.ARGB_8888);
+                  bitmap.eraseColor(Color.WHITE);
+                  page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+                }
+              }
+              postToUi(
+                  () -> {
+                    if (holder.boundPage != position) return;
+                    ViewGroup.LayoutParams params = holder.pageView.getLayoutParams();
+                    params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+                    holder.pageView.setLayoutParams(params);
+                    holder.pageView.setImageBitmap(bitmap);
+                  });
+            } catch (Exception e) {
+              // Renderer closed mid-render (page recycled) or a corrupt page; leave placeholder
+              LogUtils.w("FileViewerActivity", "PDF page render skipped: " + e.getMessage());
+            }
+          });
+    }
+
+    @Override
+    public int getItemCount() {
+      return pageCount;
+    }
+  }
+
+  /** One page per file: an image page, a scrollable text page, or a PDF page list. */
   private class ViewerAdapter extends RecyclerView.Adapter<PageHolder> {
 
     @Override
     public int getItemViewType(int position) {
-      return isImage(files.get(position).getName()) ? PAGE_TYPE_IMAGE : PAGE_TYPE_TEXT;
+      String name = files.get(position).getName();
+      if (isImage(name)) return PAGE_TYPE_IMAGE;
+      if (isPdf(name)) return PAGE_TYPE_PDF;
+      return PAGE_TYPE_TEXT;
     }
 
     @NonNull
     @Override
     public PageHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-      int layout =
-          viewType == PAGE_TYPE_IMAGE ? R.layout.item_viewer_image : R.layout.item_viewer_text;
+      int layout;
+      if (viewType == PAGE_TYPE_IMAGE) {
+        layout = R.layout.item_viewer_image;
+      } else if (viewType == PAGE_TYPE_PDF) {
+        layout = R.layout.item_viewer_pdf;
+      } else {
+        layout = R.layout.item_viewer_text;
+      }
       return new PageHolder(
           LayoutInflater.from(parent.getContext()).inflate(layout, parent, false));
     }
@@ -317,6 +434,11 @@ public class FileViewerActivity extends AppCompatActivity {
     @Override
     public void onBindViewHolder(@NonNull PageHolder holder, int position) {
       holder.bind(files.get(position));
+    }
+
+    @Override
+    public void onViewRecycled(@NonNull PageHolder holder) {
+      holder.releasePdf();
     }
 
     @Override
@@ -329,20 +451,28 @@ public class FileViewerActivity extends AppCompatActivity {
   private class PageHolder extends RecyclerView.ViewHolder {
     private final @Nullable ImageView imageView;
     private final @Nullable TextView textView;
+    private final @Nullable RecyclerView pdfPages;
     private final View progress;
     private final TextView errorView;
     private String boundPath;
+    private @Nullable PdfRenderer pdfRenderer;
+    private @Nullable ParcelFileDescriptor pdfFd;
 
     PageHolder(@NonNull View itemView) {
       super(itemView);
       imageView = itemView.findViewById(R.id.viewer_image);
       textView = itemView.findViewById(R.id.viewer_text);
+      pdfPages = itemView.findViewById(R.id.viewer_pdf_pages);
       progress = itemView.findViewById(R.id.viewer_progress);
       errorView = itemView.findViewById(R.id.viewer_error);
+      if (pdfPages != null) {
+        pdfPageHolders.add(this);
+      }
     }
 
     void bind(SmbFileItem item) {
       boundPath = item.getPath();
+      releasePdf();
       progress.setVisibility(View.VISIBLE);
       errorView.setVisibility(View.GONE);
       if (imageView != null) imageView.setImageDrawable(null);
@@ -352,7 +482,9 @@ public class FileViewerActivity extends AppCompatActivity {
           item,
           localFile -> {
             if (!item.getPath().equals(boundPath)) return; // recycled onto another file
-            if (imageView != null) {
+            if (pdfPages != null) {
+              loadPdf(item, localFile);
+            } else if (imageView != null) {
               loadImage(item, localFile);
             } else {
               loadText(item, localFile);
@@ -364,6 +496,69 @@ public class FileViewerActivity extends AppCompatActivity {
             errorView.setText(getString(R.string.viewer_error_loading, item.getName()));
             errorView.setVisibility(View.VISIBLE);
           });
+    }
+
+    private void loadPdf(SmbFileItem item, File localFile) {
+      executor.execute(
+          () -> {
+            ParcelFileDescriptor fd = null;
+            PdfRenderer renderer = null;
+            try {
+              fd = ParcelFileDescriptor.open(localFile, ParcelFileDescriptor.MODE_READ_ONLY);
+              renderer = new PdfRenderer(fd);
+            } catch (Exception e) {
+              LogUtils.e("FileViewerActivity", "PDF open failed: " + e.getMessage());
+              closeQuietly(renderer, fd);
+              postToUi(
+                  () -> {
+                    if (!item.getPath().equals(boundPath)) return;
+                    progress.setVisibility(View.GONE);
+                    errorView.setText(getString(R.string.viewer_error_loading, item.getName()));
+                    errorView.setVisibility(View.VISIBLE);
+                  });
+              return;
+            }
+            final ParcelFileDescriptor openedFd = fd;
+            final PdfRenderer openedRenderer = renderer;
+            postToUi(
+                () -> {
+                  if (!item.getPath().equals(boundPath)) {
+                    closeQuietly(openedRenderer, openedFd);
+                    return;
+                  }
+                  releasePdf();
+                  pdfRenderer = openedRenderer;
+                  pdfFd = openedFd;
+                  progress.setVisibility(View.GONE);
+                  pdfPages.setLayoutManager(new LinearLayoutManager(FileViewerActivity.this));
+                  pdfPages.setAdapter(new PdfPagesAdapter(openedRenderer));
+                });
+          });
+    }
+
+    /** Detaches and closes any open PDF renderer and its file descriptor. */
+    void releasePdf() {
+      if (pdfPages != null) {
+        pdfPages.setAdapter(null);
+      }
+      if (pdfRenderer != null) {
+        synchronized (pdfRenderer) {
+          try {
+            pdfRenderer.close();
+          } catch (Exception ignored) {
+            // already closed
+          }
+        }
+        pdfRenderer = null;
+      }
+      if (pdfFd != null) {
+        try {
+          pdfFd.close();
+        } catch (Exception ignored) {
+          // already closed
+        }
+        pdfFd = null;
+      }
     }
 
     private void loadImage(SmbFileItem item, File localFile) {
