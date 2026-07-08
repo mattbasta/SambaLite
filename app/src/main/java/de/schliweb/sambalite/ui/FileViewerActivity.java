@@ -371,7 +371,8 @@ public class FileViewerActivity extends AppCompatActivity {
 
     PdfPagesAdapter(PdfRenderer renderer) {
       this.renderer = renderer;
-      this.pageWidth = getResources().getDisplayMetrics().widthPixels;
+      // Render at 1.5x screen width so text stays crisp; full pinch-zoom for PDFs is a follow-up
+      this.pageWidth = (int) (getResources().getDisplayMetrics().widthPixels * 1.5f);
       this.pageCount = renderer.getPageCount();
     }
 
