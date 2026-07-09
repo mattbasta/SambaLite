@@ -71,6 +71,9 @@ import java.util.concurrent.TimeUnit;
  */
 public class TransferWorker extends Worker {
 
+  /** Unique WorkManager name for the queue-processing work. */
+  public static final String WORK_NAME = "transfer_queue";
+
   private static final String TAG = "TransferWorker";
   private static final int BUFFER_SIZE = 262144;
   private static final long PROGRESS_SAVE_INTERVAL = 2 * 1024 * 1024;
@@ -149,6 +152,44 @@ public class TransferWorker extends Worker {
     if (notificationManager != null) {
       notificationManager.notify(NOTIFICATION_ID, buildNotification(title, content));
     }
+  }
+
+  /**
+   * Enqueues queue processing with a policy that cannot be starved by retry backoff.
+   *
+   * <p>A failing run makes WorkManager re-schedule this unique work with exponential backoff (up to
+   * five hours). With a plain KEEP policy, transfers enqueued during that window silently wait for
+   * the backoff timer. This helper REPLACEs the work when it is not currently RUNNING — a fresh
+   * request carries no backoff, so user-initiated transfers start immediately — and KEEPs a RUNNING
+   * worker, which already loops over newly inserted transfers.
+   */
+  public static void enqueueQueueProcessing(@NonNull Context context) {
+    androidx.work.WorkManager workManager = androidx.work.WorkManager.getInstance(context);
+
+    androidx.work.ExistingWorkPolicy policy = androidx.work.ExistingWorkPolicy.REPLACE;
+    try {
+      for (androidx.work.WorkInfo info :
+          workManager.getWorkInfosForUniqueWork(WORK_NAME).get(2, TimeUnit.SECONDS)) {
+        if (info.getState() == androidx.work.WorkInfo.State.RUNNING) {
+          policy = androidx.work.ExistingWorkPolicy.KEEP;
+          break;
+        }
+      }
+    } catch (Exception e) {
+      // If the state cannot be determined, do not risk cancelling a running transfer
+      LogUtils.w(TAG, "Could not query transfer work state, keeping existing work: " + e);
+      policy = androidx.work.ExistingWorkPolicy.KEEP;
+    }
+
+    androidx.work.OneTimeWorkRequest request =
+        new androidx.work.OneTimeWorkRequest.Builder(TransferWorker.class)
+            .setConstraints(
+                new androidx.work.Constraints.Builder()
+                    .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
+                    .build())
+            .build();
+    workManager.enqueueUniqueWork(WORK_NAME, policy, request);
+    LogUtils.d(TAG, "TransferWorker enqueued (" + policy + " policy)");
   }
 
   @NonNull

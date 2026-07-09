@@ -181,14 +181,17 @@ public interface PendingTransferDao {
   int resetActiveToRetry(long now);
 
   /**
-   * Resets FAILED transfers back to PENDING with retry count and progress reset (for retry after
-   * reboot). Setting bytes_transferred to 0 is intentional for the current phase — it ensures that
-   * uploads and downloads always restart from the beginning. This effectively disables the resume
-   * logic in {@code TransferWorker.processUpload()}.
+   * Resets FAILED transfers back to PENDING for retry after app restart or reboot — but only those
+   * that have not exhausted their retries. Preserving retry_count is what makes permanently failing
+   * transfers (e.g. a lost URI permission) eventually stay FAILED instead of poisoning every worker
+   * run and ratcheting up WorkManager's retry backoff; they can still be retried manually from the
+   * transfer queue. Setting bytes_transferred to 0 is intentional for the current phase — it
+   * ensures that uploads and downloads always restart from the beginning. This effectively disables
+   * the resume logic in {@code TransferWorker.processUpload()}.
    */
   @Query(
-      "UPDATE pending_transfer SET status = 'PENDING', retry_count = 0, bytes_transferred = 0, updated_at = :now"
-          + " WHERE status = 'FAILED'")
+      "UPDATE pending_transfer SET status = 'PENDING', bytes_transferred = 0, updated_at = :now"
+          + " WHERE status = 'FAILED' AND retry_count < max_retries")
   int resetFailedToRetry(long now);
 
   /** Updates status only if the transfer is currently ACTIVE (avoids overwriting CANCELLED). */
