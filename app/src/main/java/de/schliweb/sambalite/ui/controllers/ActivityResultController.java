@@ -171,9 +171,30 @@ public class ActivityResultController {
     // Clean up UI state first
     inputController.hideKeyboardAndClearFocus();
 
+    // Persist read permission so the TransferWorker can open the URI after app restart:
+    // queued uploads may run much later, when the picker's ephemeral grant is gone
+    persistUploadReadPermission(uri, "upload source file");
+
     // Delegate to the file operation callback
     if (fileOperationCallback != null) {
       fileOperationCallback.onFileUploadResult(uri);
+    }
+  }
+
+  /**
+   * Persists read access to a picked upload source so the TransferWorker can still open it after
+   * the app process is restarted. Best effort: some providers do not support persistable grants, in
+   * which case the upload works as before while the process lives.
+   */
+  private void persistUploadReadPermission(@NonNull Uri uri, @NonNull String what) {
+    try {
+      activity
+          .getContentResolver()
+          .takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+    } catch (Exception e) {
+      LogUtils.w(
+          "ActivityResultController",
+          "takePersistableUriPermission failed for " + what + ": " + e.getMessage());
     }
   }
 
@@ -253,6 +274,10 @@ public class ActivityResultController {
   private void handlePickFolderResult(Uri uri) {
     // Clean up UI state first
     inputController.hideKeyboardAndClearFocus();
+
+    // Persist read permission on the tree URI; queued child-document uploads derive their
+    // access from this grant and would otherwise fail after an app restart
+    persistUploadReadPermission(uri, "upload source folder");
 
     // Delegate to the file operation callback
     if (fileOperationCallback != null) {
@@ -348,6 +373,9 @@ public class ActivityResultController {
     intent.addCategory(Intent.CATEGORY_OPENABLE);
     intent.setType("*/*"); // Allow any file type
     intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+    // Request persistable permission so queued uploads survive an app restart
+    intent.addFlags(
+        Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
     LogUtils.d("ActivityResultController", "Starting file picker activity for upload");
     pickFileLauncher.launch(intent);
   }
@@ -356,6 +384,9 @@ public class ActivityResultController {
   public void selectFolderToUpload() {
     LogUtils.d("ActivityResultController", "Selecting folder for folder contents upload");
     Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+    // Request persistable permission so queued child uploads survive an app restart
+    intent.addFlags(
+        Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
     pickFolderLauncher.launch(intent);
   }
 
@@ -411,6 +442,9 @@ public class ActivityResultController {
    */
   private void handleMultiplePickFileResult(@NonNull List<Uri> uris) {
     inputController.hideKeyboardAndClearFocus();
+    for (Uri uri : uris) {
+      persistUploadReadPermission(uri, "upload source file");
+    }
     if (fileOperationCallback != null) {
       fileOperationCallback.onMultipleFileUploadResult(uris);
     }
