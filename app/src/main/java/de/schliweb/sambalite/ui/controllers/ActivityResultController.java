@@ -171,9 +171,36 @@ public class ActivityResultController {
     // Clean up UI state first
     inputController.hideKeyboardAndClearFocus();
 
+    // Keep read access after the app process stops. The transfer queue can start this
+    // upload much later, when the temporary permission from the file picker is not available.
+    persistUploadReadPermission(uri, "upload source file");
+
     // Delegate to the file operation callback
     if (fileOperationCallback != null) {
       fileOperationCallback.onFileUploadResult(uri);
+    }
+  }
+
+  /**
+   * Takes a persistable read permission for a selected upload source. {@code TransferWorker} can
+   * then open the URI after the app process stops and starts again.
+   *
+   * <p>Some content providers do not give persistable permissions. The method thus catches the
+   * exception and writes a log message. The upload then has the same behavior as before: it is
+   * successful while the app process continues to run.
+   *
+   * @param uri The URI of the selected file or folder
+   * @param sourceType The type of the source, for the log message
+   */
+  private void persistUploadReadPermission(@NonNull Uri uri, @NonNull String sourceType) {
+    try {
+      activity
+          .getContentResolver()
+          .takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+    } catch (Exception e) {
+      LogUtils.w(
+          "ActivityResultController",
+          "takePersistableUriPermission failed for " + sourceType + ": " + e.getMessage());
     }
   }
 
@@ -253,6 +280,10 @@ public class ActivityResultController {
   private void handlePickFolderResult(Uri uri) {
     // Clean up UI state first
     inputController.hideKeyboardAndClearFocus();
+
+    // Keep read access to the folder. The queued uploads of the child documents use this
+    // permission, thus they fail after an app restart if the permission is not persistable.
+    persistUploadReadPermission(uri, "upload source folder");
 
     // Delegate to the file operation callback
     if (fileOperationCallback != null) {
@@ -348,6 +379,10 @@ public class ActivityResultController {
     intent.addCategory(Intent.CATEGORY_OPENABLE);
     intent.setType("*/*"); // Allow any file type
     intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+    // Request a persistable permission, because the transfer queue can start the
+    // upload after the app process stops and starts again
+    intent.addFlags(
+        Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
     LogUtils.d("ActivityResultController", "Starting file picker activity for upload");
     pickFileLauncher.launch(intent);
   }
@@ -356,6 +391,10 @@ public class ActivityResultController {
   public void selectFolderToUpload() {
     LogUtils.d("ActivityResultController", "Selecting folder for folder contents upload");
     Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+    // Request a persistable permission, because the transfer queue can start the
+    // uploads of the child documents after the app process stops and starts again
+    intent.addFlags(
+        Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
     pickFolderLauncher.launch(intent);
   }
 
@@ -411,6 +450,9 @@ public class ActivityResultController {
    */
   private void handleMultiplePickFileResult(@NonNull List<Uri> uris) {
     inputController.hideKeyboardAndClearFocus();
+    for (Uri uri : uris) {
+      persistUploadReadPermission(uri, "upload source file");
+    }
     if (fileOperationCallback != null) {
       fileOperationCallback.onMultipleFileUploadResult(uris);
     }
