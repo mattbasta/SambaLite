@@ -23,7 +23,13 @@ import android.provider.OpenableColumns;
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 import androidx.documentfile.provider.DocumentFile;
+import androidx.work.Constraints;
+import androidx.work.ExistingWorkPolicy;
 import androidx.work.ForegroundInfo;
+import androidx.work.NetworkType;
+import androidx.work.OneTimeWorkRequest;
+import androidx.work.WorkInfo;
+import androidx.work.WorkManager;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 import com.hierynomus.msdtyp.AccessMask;
@@ -195,38 +201,41 @@ public class TransferWorker extends Worker {
   }
 
   /**
-   * Enqueues queue processing with a policy that cannot be starved by retry backoff.
+   * Enqueues queue processing with a policy that retry backoff cannot starve.
    *
-   * <p>A failing run makes WorkManager re-schedule this unique work with exponential backoff (up to
-   * five hours). With a plain KEEP policy, transfers enqueued during that window silently wait for
-   * the backoff timer. This helper REPLACEs the work when it is not currently RUNNING — a fresh
-   * request carries no backoff, so user-initiated transfers start immediately — and KEEPs a RUNNING
-   * worker, which already loops over newly inserted transfers.
+   * <p>A failed run makes WorkManager schedule this unique work again with exponential backoff, up
+   * to five hours. With the KEEP policy, transfers that the user adds during that period wait for
+   * the backoff timer. This method uses REPLACE when the work is not RUNNING, because a new request
+   * has no backoff and starts immediately. It uses KEEP when the work is RUNNING, because the
+   * running worker does not stop and its loop finds the new transfers in the database.
+   *
+   * <p>This method reads the work state and can block for up to two seconds. Call it from a
+   * background thread.
+   *
+   * @param context The context that gives access to WorkManager
    */
   public static void enqueueQueueProcessing(@NonNull Context context) {
-    androidx.work.WorkManager workManager = androidx.work.WorkManager.getInstance(context);
+    WorkManager workManager = WorkManager.getInstance(context);
 
-    androidx.work.ExistingWorkPolicy policy = androidx.work.ExistingWorkPolicy.REPLACE;
+    ExistingWorkPolicy policy = ExistingWorkPolicy.REPLACE;
     try {
-      for (androidx.work.WorkInfo info :
+      for (WorkInfo info :
           workManager.getWorkInfosForUniqueWork(WORK_NAME).get(2, TimeUnit.SECONDS)) {
-        if (info.getState() == androidx.work.WorkInfo.State.RUNNING) {
-          policy = androidx.work.ExistingWorkPolicy.KEEP;
+        if (info.getState() == WorkInfo.State.RUNNING) {
+          policy = ExistingWorkPolicy.KEEP;
           break;
         }
       }
     } catch (Exception e) {
-      // If the state cannot be determined, do not risk cancelling a running transfer
-      LogUtils.w(TAG, "Could not query transfer work state, keeping existing work: " + e);
-      policy = androidx.work.ExistingWorkPolicy.KEEP;
+      // If the state is unknown, keep the existing work to protect a running transfer
+      LogUtils.w(TAG, "Could not read transfer work state, keeps existing work: " + e.getMessage());
+      policy = ExistingWorkPolicy.KEEP;
     }
 
-    androidx.work.OneTimeWorkRequest request =
-        new androidx.work.OneTimeWorkRequest.Builder(TransferWorker.class)
+    OneTimeWorkRequest request =
+        new OneTimeWorkRequest.Builder(TransferWorker.class)
             .setConstraints(
-                new androidx.work.Constraints.Builder()
-                    .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
-                    .build())
+                new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .build();
     workManager.enqueueUniqueWork(WORK_NAME, policy, request);
     LogUtils.d(TAG, "TransferWorker enqueued (" + policy + " policy)");

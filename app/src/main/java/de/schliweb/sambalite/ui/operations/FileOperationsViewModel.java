@@ -1287,9 +1287,9 @@ public class FileOperationsViewModel extends ViewModel {
   }
 
   /**
-   * Starts the TransferWorker via WorkManager. A running worker is kept (it loops internally to
-   * pick up newly added transfers); a merely enqueued one is replaced so retry backoff cannot delay
-   * fresh user-initiated transfers.
+   * Starts the TransferWorker with WorkManager. The helper keeps a worker that runs, because its
+   * loop finds the new transfers. The helper replaces a worker that only waits, because the retry
+   * backoff must not delay a transfer that the user starts.
    */
   void startTransferWorker() {
     TransferWorker.enqueueQueueProcessing(context);
