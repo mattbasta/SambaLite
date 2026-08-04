@@ -50,6 +50,13 @@ import javax.inject.Singleton;
 @Singleton
 public class SmbRepositoryImpl implements SmbRepository {
 
+  // Larger read/write/transact buffers reduce the number of SMB2 READ/WRITE packets per
+  // transfer, which lowers per-packet overhead (especially with SMB3 encryption). The
+  // effective size is still capped by what the server negotiates.
+  private static final int TRANSFER_BUFFER_SIZE = 8 * 1024 * 1024;
+  // Copy buffer used when shoveling bytes between SMB streams and local files.
+  private static final int COPY_BUFFER_SIZE = 256 * 1024;
+
   @NonNull private final SMBClient smbClient;
   // Thread-local to track the currently connected share name for path normalization
   @NonNull private final ThreadLocal<String> currentShareName = new ThreadLocal<>();
@@ -79,28 +86,45 @@ public class SmbRepositoryImpl implements SmbRepository {
     } catch (Throwable ignored) {
     }
 
-    if (!encrypt && !sign && !async) {
+    boolean anonymous = isAnonymousConnection(connection);
+
+    if (!encrypt && !sign && !async && !anonymous) {
       return this.smbClient; // shared default client
     }
 
     SmbConfig.Builder builder =
         SmbConfig.builder().withEncryptData(encrypt).withSigningRequired(sign);
+    applyTransferBufferSizes(builder);
 
     if (async) {
       builder.withTransportLayerFactory(new AsyncDirectTcpTransportFactory<>());
       LogUtils.i("SmbRepositoryImpl", "Using AsyncDirectTcpTransport for improved performance");
     }
 
-    // Optional, prevents fallback to NT1:
-    try {
-      builder.withDialects(
-          com.hierynomus.mssmb2.SMB2Dialect.SMB_3_1_1,
-          com.hierynomus.mssmb2.SMB2Dialect.SMB_3_0_2,
-          com.hierynomus.mssmb2.SMB2Dialect.SMB_3_0,
-          com.hierynomus.mssmb2.SMB2Dialect.SMB_2_1,
-          com.hierynomus.mssmb2.SMB2Dialect.SMB_2_0_2);
-    } catch (Throwable ignored) {
-      /* older SMBJ versions do not support these dialects */
+    if (anonymous) {
+      // Anonymous/guest sessions: restrict to SMB2 dialects. SMBJ 0.14.0 crashes with a
+      // NullPointerException when deriving SMB3 signing keys for anonymous sessions if the
+      // server does not set the IS_NULL/IS_GUEST session flags (hierynomus/smbj#792).
+      // SMB3 signing/encryption offers no protection for anonymous sessions anyway.
+      try {
+        builder.withDialects(
+            com.hierynomus.mssmb2.SMB2Dialect.SMB_2_1, com.hierynomus.mssmb2.SMB2Dialect.SMB_2_0_2);
+      } catch (Throwable ignored) {
+        /* keep SMBJ defaults if the running SMBJ version rejects these values */
+      }
+      LogUtils.i("SmbRepositoryImpl", "Anonymous connection: restricting to SMB2 dialects");
+    } else {
+      // Optional, prevents fallback to NT1:
+      try {
+        builder.withDialects(
+            com.hierynomus.mssmb2.SMB2Dialect.SMB_3_1_1,
+            com.hierynomus.mssmb2.SMB2Dialect.SMB_3_0_2,
+            com.hierynomus.mssmb2.SMB2Dialect.SMB_3_0,
+            com.hierynomus.mssmb2.SMB2Dialect.SMB_2_1,
+            com.hierynomus.mssmb2.SMB2Dialect.SMB_2_0_2);
+      } catch (Throwable ignored) {
+        /* older SMBJ versions do not support these dialects */
+      }
     }
 
     LogUtils.d(
@@ -126,9 +150,31 @@ public class SmbRepositoryImpl implements SmbRepository {
     // Intentionally left empty to avoid false positives.
   }
 
+  /**
+   * Applies the larger transfer buffer sizes to the given config builder. Falls back to SMBJ
+   * defaults if the running SMBJ version rejects these values.
+   */
+  private static void applyTransferBufferSizes(SmbConfig.Builder builder) {
+    try {
+      builder
+          .withReadBufferSize(TRANSFER_BUFFER_SIZE)
+          .withWriteBufferSize(TRANSFER_BUFFER_SIZE)
+          .withTransactBufferSize(TRANSFER_BUFFER_SIZE);
+    } catch (Throwable ignored) {
+      /* keep SMBJ defaults if the running SMBJ version rejects these values */
+    }
+  }
+
+  /** Creates the shared default SMB client with performance-tuned buffer sizes. */
+  private static SMBClient createDefaultClient() {
+    SmbConfig.Builder builder = SmbConfig.builder();
+    applyTransferBufferSizes(builder);
+    return new SMBClient(builder.build());
+  }
+
   @Inject
   public SmbRepositoryImpl(@NonNull BackgroundSmbManager backgroundManager) {
-    this.smbClient = new SMBClient();
+    this.smbClient = createDefaultClient();
     this.backgroundManager = backgroundManager;
     this.errorHandler = SmartErrorHandler.getInstance();
     this.scheduler = Executors.newSingleThreadScheduledExecutor();
@@ -324,8 +370,18 @@ public class SmbRepositoryImpl implements SmbRepository {
   }
 
   /**
+   * Returns true if the connection has neither username nor password, i.e. anonymous/guest access
+   * is requested.
+   */
+  private static boolean isAnonymousConnection(SmbConnection connection) {
+    String username = connection.getUsername() != null ? connection.getUsername() : "";
+    String password = connection.getPassword() != null ? connection.getPassword() : "";
+    return username.isEmpty() && password.isEmpty();
+  }
+
+  /**
    * Creates an AuthenticationContext from the connection details. If both username and password are
-   * empty, uses guest authentication.
+   * empty, uses anonymous authentication (behaves like {@code mount.cifs -o guest}, see issue #32).
    */
   private AuthenticationContext createAuthContext(SmbConnection connection) {
     LogUtils.d(
@@ -341,10 +397,10 @@ public class SmbRepositoryImpl implements SmbRepository {
       LogUtils.d("SmbRepositoryImpl", "Using domain: " + domain);
     }
 
-    // If both username and password are empty, use guest authentication
+    // If both username and password are empty, use anonymous authentication
     if (username.isEmpty() && password.isEmpty()) {
-      LogUtils.d("SmbRepositoryImpl", "Using guest authentication");
-      return AuthenticationContext.guest();
+      LogUtils.d("SmbRepositoryImpl", "Using anonymous (guest) authentication");
+      return new AuthenticationContext("", new char[0], domain);
     }
 
     return new AuthenticationContext(username, password.toCharArray(), domain);
@@ -537,7 +593,7 @@ public class SmbRepositoryImpl implements SmbRepository {
             long skipped = is.skip(resumeFrom);
             LogUtils.d("SmbRepositoryImpl", "Skipped " + skipped + " bytes for resume");
           }
-          byte[] buffer = new byte[65536];
+          byte[] buffer = new byte[COPY_BUFFER_SIZE];
           int bytesRead;
           long totalBytes = resumeFrom;
           while ((bytesRead = is.read(buffer)) != -1) {
@@ -952,6 +1008,22 @@ public class SmbRepositoryImpl implements SmbRepository {
   }
 
   @Override
+  public boolean folderExists(@NonNull SmbConnection connection, @NonNull String path)
+      throws Exception {
+    LogUtils.d("SmbRepositoryImpl", "Checking if folder exists: " + path);
+    return withShare(
+        connection,
+        share -> {
+          String folderPath = getPathWithoutShare(path);
+          boolean exists = folderPath.isEmpty() || share.folderExists(folderPath);
+          LogUtils.i(
+              "SmbRepositoryImpl",
+              "Folder " + (exists ? "exists" : "does not exist") + ": " + folderPath);
+          return exists;
+        });
+  }
+
+  @Override
   public long getRemoteFileSize(@NonNull SmbConnection connection, @NonNull String path) {
     try {
       return withShare(
@@ -1036,6 +1108,50 @@ public class SmbRepositoryImpl implements SmbRepository {
               return Arrays.copyOf(buffer, Math.max(0, read));
             }
             return buffer;
+          }
+        });
+  }
+
+  @Override
+  public byte[] readFileBytes(
+      @NonNull SmbConnection connection, @NonNull String remotePath, long maxBytes)
+      throws Exception {
+    final int chunkSize = 256 * 1024; // 256KB chunks for fewer round-trips
+    return withShare(
+        connection,
+        share -> {
+          String filePath = getPathWithoutShare(remotePath);
+          try (File remoteFile =
+              share.openFile(
+                  filePath,
+                  EnumSet.of(AccessMask.GENERIC_READ),
+                  null,
+                  SMB2ShareAccess.ALL,
+                  SMB2CreateDisposition.FILE_OPEN,
+                  null)) {
+            long fileSize = remoteFile.getFileInformation().getStandardInformation().getEndOfFile();
+            if (maxBytes > 0 && fileSize > maxBytes) {
+              throw new IOException(
+                  "File too large to read into memory: "
+                      + remotePath
+                      + " ("
+                      + fileSize
+                      + " bytes)");
+            }
+            java.io.ByteArrayOutputStream out =
+                new java.io.ByteArrayOutputStream((int) Math.max(16, fileSize));
+            byte[] chunk = new byte[(int) Math.min(chunkSize, Math.max(1, fileSize))];
+            long offset = 0;
+            while (offset < fileSize) {
+              int toRead = (int) Math.min(chunk.length, fileSize - offset);
+              int read = remoteFile.read(chunk, offset, 0, toRead);
+              if (read <= 0) {
+                break;
+              }
+              out.write(chunk, 0, read);
+              offset += read;
+            }
+            return out.toByteArray();
           }
         });
   }
@@ -1169,11 +1285,18 @@ public class SmbRepositoryImpl implements SmbRepository {
             try (InputStream is = remoteFile.getInputStream();
                 java.io.FileOutputStream fos = new java.io.FileOutputStream(localFile)) {
 
-              byte[] buffer = new byte[65536];
+              byte[] buffer = new byte[COPY_BUFFER_SIZE];
               int bytesRead;
               long totalBytes = 0;
               long fileSize =
                   remoteFile.getFileInformation().getStandardInformation().getEndOfFile();
+
+              // Progress throttling (same scheme as uploads)
+              long lastProgressUpdate = 0;
+              final long PROGRESS_UPDATE_INTERVAL = 500;
+              final int MAX_PROGRESS_UPDATES = 100;
+              final long updateThreshold = Math.max(fileSize / MAX_PROGRESS_UPDATES, 1);
+              long lastUpdateBytes = 0;
 
               while ((bytesRead = is.read(buffer)) != -1) {
                 // Check for cancellation during download
@@ -1186,9 +1309,19 @@ public class SmbRepositoryImpl implements SmbRepository {
                 fos.write(buffer, 0, bytesRead);
                 totalBytes += bytesRead;
 
-                // Progress Update
+                // Throttled progress update
                 if (progressCallback != null && fileSize > 0) {
-                  progressCallback.updateBytesProgress(totalBytes, fileSize, localFile.getName());
+                  long currentTime = System.currentTimeMillis();
+                  boolean shouldUpdate =
+                      (currentTime - lastProgressUpdate >= PROGRESS_UPDATE_INTERVAL)
+                          || (totalBytes - lastUpdateBytes >= updateThreshold)
+                          || (lastUpdateBytes == 0)
+                          || (totalBytes == fileSize);
+                  if (shouldUpdate) {
+                    progressCallback.updateBytesProgress(totalBytes, fileSize, localFile.getName());
+                    lastProgressUpdate = currentTime;
+                    lastUpdateBytes = totalBytes;
+                  }
                 }
               }
 
@@ -1354,7 +1487,7 @@ public class SmbRepositoryImpl implements SmbRepository {
               java.io.FileInputStream fis = new java.io.FileInputStream(localFile);
               OutputStream os = remoteFile.getOutputStream()) {
 
-            byte[] buffer = new byte[65536];
+            byte[] buffer = new byte[COPY_BUFFER_SIZE];
             int bytesRead;
             long totalBytes = 0;
             long fileSize = localFile.length();
@@ -2139,7 +2272,7 @@ public class SmbRepositoryImpl implements SmbRepository {
             LogUtils.d("SmbRepositoryImpl", "Skipped " + skipped + " bytes for resume");
           }
 
-          byte[] buffer = new byte[65536];
+          byte[] buffer = new byte[COPY_BUFFER_SIZE];
           int bytesRead;
           long totalBytes = resumeFrom;
           long fileSize = remoteFile.getFileInformation().getStandardInformation().getEndOfFile();
